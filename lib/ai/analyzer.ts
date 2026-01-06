@@ -94,14 +94,15 @@ CURRENT SITUATION:
 AVAILABLE CONTRACTS:
 ${contractsList}
 
-Analyze these contracts and select the best 3 (or fewer if not confident) to allocate $${request.dailyBudget} across.
+Analyze these contracts and select exactly 3 contracts to allocate exactly $${request.dailyBudget} across.
 
 Remember:
-- Be selective. Quality over quantity.
-- Consider historical patterns from above.
+- You must select exactly 3 contracts.
+- Total allocation must equal $${request.dailyBudget}.
+- Minimum $30 per contract, maximum $40 per contract.
 - Diversify across uncorrelated events.
-- Minimum $20 per contract, maximum $50.
-- If uncertain, allocate less than the full budget.
+- Consider historical patterns from above.
+- Higher conviction contracts get larger allocations.
 `.trim();
 }
 
@@ -119,7 +120,7 @@ function parseAIResponse(text: string, contracts: Contract[]): AnalysisResponse 
     const parsed = JSON.parse(jsonText);
     
     // Map market_ids to contracts
-    const selectedContracts = parsed.selected_contracts.map((sc: any) => {
+    let selectedContracts = parsed.selected_contracts.map((sc: any) => {
       const contract = contracts.find(c => c.market_id === sc.market_id);
       if (!contract) {
         throw new Error(`Contract not found: ${sc.market_id}`);
@@ -127,16 +128,35 @@ function parseAIResponse(text: string, contracts: Contract[]): AnalysisResponse 
       
       return {
         contract,
-        allocation: Math.min(Math.max(sc.allocation, 20), 50), // Clamp between 20-50
+        allocation: Math.min(Math.max(sc.allocation, 30), 40), // Clamp between 30-40
         confidence: Math.min(Math.max(sc.confidence, 0), 1), // Clamp between 0-1
         reasoning: sc.reasoning || 'No reasoning provided',
         riskFactors: sc.risk_factors || [],
       };
     });
 
+    // Ensure exactly 3 contracts
+    if (selectedContracts.length !== 3) {
+      throw new Error(`AI must select exactly 3 contracts, got ${selectedContracts.length}`);
+    }
+    
+    // Normalize allocations to sum to exactly dailyBudget
+    const totalAllocated = selectedContracts.reduce((sum: number, sc: any) => sum + sc.allocation, 0);
+    if (Math.abs(totalAllocated - request.dailyBudget) > 0.01) {
+      const scale = request.dailyBudget / totalAllocated;
+      selectedContracts = selectedContracts.map((sc: any) => ({
+        ...sc,
+        allocation: Math.round(sc.allocation * scale * 100) / 100,
+      }));
+      // Adjust last contract to ensure exact total
+      const adjustedTotal = selectedContracts.reduce((sum: number, sc: any) => sum + sc.allocation, 0);
+      selectedContracts[selectedContracts.length - 1].allocation += (request.dailyBudget - adjustedTotal);
+      selectedContracts[selectedContracts.length - 1].allocation = Math.round(selectedContracts[selectedContracts.length - 1].allocation * 100) / 100;
+    }
+
     return {
       selectedContracts,
-      totalAllocated: parsed.total_allocated || selectedContracts.reduce((sum: number, sc: any) => sum + sc.allocation, 0),
+      totalAllocated: request.dailyBudget,
       strategyNotes: parsed.strategy_notes || 'No strategy notes',
     };
   } catch (error: any) {

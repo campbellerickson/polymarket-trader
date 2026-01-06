@@ -1,5 +1,5 @@
 export const TRADING_CONSTANTS = {
-  DAILY_BUDGET: Number(process.env.DAILY_BUDGET) || 20, // $20/day with $100 bankroll
+  DAILY_BUDGET: Number(process.env.DAILY_BUDGET) || 100, // $100/day - 3 buys totaling $100
   MIN_ODDS: Number(process.env.MIN_ODDS) || 0.90,
   MAX_ODDS: Number(process.env.MAX_ODDS) || 0.98,
   MAX_DAYS_TO_RESOLUTION: Number(process.env.MAX_DAYS_TO_RESOLUTION) || 2,

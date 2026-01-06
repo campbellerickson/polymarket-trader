@@ -31,11 +31,12 @@ ANALYSIS FRAMEWORK:
    ADAPT your strategy based on this data.
 
 5. POSITION SIZING
-   Allocate $100 across 3 contracts using Kelly-ish principles:
+   Allocate exactly $100 across exactly 3 contracts:
    - Higher conviction = larger allocation
    - Diversify across uncorrelated events
-   - Minimum $20, maximum $50 per contract
-   - If you're not confident in 3 contracts, allocate less than $100
+   - Minimum $30, maximum $40 per contract
+   - Total must equal $100 across 3 contracts
+   - If you can't find 3 good contracts, reduce allocation proportionally but still select 3
 
 RESPONSE FORMAT (JSON):
 {
