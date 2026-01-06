@@ -13,7 +13,7 @@ Time: ${new Date().toISOString()}`;
 
   // Log error (notifications removed)
   console.error('🚨 ERROR ALERT:', message);
-  await sendEmail('admin@polymarket-trader.com', '🚨 Kalshi Trader Error', `<pre>${message}</pre>`);
+  await sendEmail('admin@kalshi-trader.com', '🚨 Kalshi Trader Error', `<pre>${message}</pre>`);
 }
 
 export async function sendDailySummary(summary: {

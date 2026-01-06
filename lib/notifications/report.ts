@@ -147,7 +147,7 @@ export function formatReportForEmail(data: DailyReportData): string {
 <body>
   <div class="container">
     <div class="header">
-      <h1>${emoji} Polymarket Daily Report</h1>
+      <h1>${emoji} Kalshi Daily Report</h1>
       <p>${data.reportDate.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
     </div>
     

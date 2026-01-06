@@ -13,7 +13,7 @@ This guide will walk you through setting up the Kalshi Automated Trading System 
 ## Step 1: Clone and Initialize
 
 ```bash
-cd /Users/campbellerickson/Desktop/Code/polymarket-trader
+cd /Users/campbellerickson/Desktop/Code/kalshi-trader
 npm install
 ```
 
@@ -132,14 +132,14 @@ curl https://your-app.vercel.app/api/cron/stop-loss \
 Once you've tested everything in dry run mode:
 
 1. Update the `DRY_RUN` environment variable in Vercel to `false`
-2. Ensure you have sufficient funds in your Polymarket wallet
+2. Ensure you have sufficient funds in your Kalshi account
 3. Monitor the first few trades closely
 
 ## Step 9: Set Up Backtesting (Optional)
 
 ### Load Historical Data
 
-You can backtest against historical Polymarket data. Create a JSON file with historical market data:
+You can backtest against historical Kalshi data. Create a JSON file with historical market data:
 
 ```json
 [
@@ -183,7 +183,7 @@ npm run backtest 2024-01-01 2024-12-31 1000 true
 
 - Verify all API keys are correct
 - Check API rate limits
-- Ensure Polymarket API access is approved
+- Ensure Kalshi API access is approved
 
 ### Cron Jobs Not Running
 

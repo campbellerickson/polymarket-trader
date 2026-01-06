@@ -1,7 +1,7 @@
 {
-  "name": "polymarket-trader",
+  "name": "kalshi-trader",
   "version": "1.0.0",
-  "description": "Automated Polymarket trading system with AI analysis",
+  "description": "Automated Kalshi trading system with AI analysis",
   "main": "index.js",
   "scripts": {
     "dev": "vercel dev",
@@ -9,7 +9,7 @@
     "test": "jest",
     "backtest": "tsx lib/backtest/runner.ts"
   },
-  "keywords": ["polymarket", "trading", "ai", "prediction-markets"],
+  "keywords": ["kalshi", "trading", "ai", "prediction-markets"],
   "author": "campbellerickson",
   "license": "MIT",
   "dependencies": {
