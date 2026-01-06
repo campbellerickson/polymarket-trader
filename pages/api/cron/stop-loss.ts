@@ -24,9 +24,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     
   } catch (error: any) {
     console.error('❌ Stop loss monitor failed:', error);
-    const { logCronError } = await import('../../lib/utils/logger');
+    const { logCronError } = await import('../../../lib/utils/logger');
     await logCronError('stop-loss', error);
-    const { sendSMS } = await import('../../lib/notifications/sms');
+    const { sendSMS } = await import('../../../lib/notifications/sms');
     console.error('🚨 CRITICAL: Stop loss monitor failed:', error.message);
     await sendSMS('admin', `🚨 CRITICAL: Stop loss monitor failed: ${error.message}`);
     

@@ -13,7 +13,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(200).json({ success: true });
   } catch (error: any) {
     console.error('❌ Resolution check failed:', error);
-    const { logCronError } = await import('../../lib/utils/logger');
+    const { logCronError } = await import('../../../lib/utils/logger');
     await logCronError('check-resolutions', error);
     return res.status(500).json({ error: error.message });
   }
