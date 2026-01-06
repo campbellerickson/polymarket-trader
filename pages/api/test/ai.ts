@@ -15,15 +15,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     // 1) Scan markets using production criteria (includes < 2 days to resolution)
     const contracts = (await scanContracts()).slice(0, limit);
-    if (contracts.length < 3) {
+    if (contracts.length === 0) {
       return res.status(200).json({
         ok: true,
-        note: 'Not enough qualifying Kalshi contracts found to select 3 (per current criteria).',
-        contracts_analyzed: contracts.length,
+        note: 'No qualifying Kalshi contracts found (per current criteria).',
+        contracts_analyzed: 0,
         dailyBudget: TRADING_CONSTANTS.DAILY_BUDGET,
         selections: [],
         total_allocated: 0,
-        strategy_notes: 'No trade recommendation for today due to insufficient qualifying contracts.',
+        strategy_notes: 'No trade recommendation for today.',
       });
     }
 

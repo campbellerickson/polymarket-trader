@@ -30,21 +30,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     });
     
     console.log(`📊 Found ${contracts.length} qualifying contracts`);
-    if (contracts.length < 3) {
-      console.log(`⚠️ Not enough qualifying contracts to place 3 buys (found ${contracts.length}). Skipping today.`);
+    if (contracts.length === 0) {
+      console.log(`⚠️ No qualifying contracts found. Skipping today.`);
       const { logError } = await import('../../../lib/utils/logger');
       await logError(
         'warning',
-        `Not enough qualifying contracts to place 3 buys (found ${contracts.length}). Skipping today.`,
+        `No qualifying contracts found. Skipping today.`,
         undefined,
-        { qualifying_contracts: contracts.length },
+        { qualifying_contracts: 0 },
         'cron'
       );
       return res.status(200).json({
         success: true,
         skipped: true,
-        reason: 'not_enough_contracts',
-        contracts_analyzed: contracts.length,
+        reason: 'no_contracts',
+        contracts_analyzed: 0,
       });
     }
     

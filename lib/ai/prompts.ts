@@ -1,7 +1,7 @@
 export const TRADING_SYSTEM_PROMPT = `
 You are an expert Kalshi trader analyzing high-probability contracts.
 
-Your goal: Select the 3 best contracts from the provided list and allocate $100 total across them.
+Your goal: Select up to 3 best contracts from the provided list and allocate up to $100 total across them.
 
 ANALYSIS FRAMEWORK:
 
@@ -31,12 +31,11 @@ ANALYSIS FRAMEWORK:
    ADAPT your strategy based on this data.
 
 5. POSITION SIZING
-   Allocate exactly $100 across exactly 3 contracts:
+   Allocate up to $100 across up to 3 contracts:
    - Higher conviction = larger allocation
    - Diversify across uncorrelated events
-   - Minimum $30, maximum $40 per contract
-   - Total must equal $100 across 3 contracts
-   - If you can't find 3 good contracts, reduce allocation proportionally but still select 3
+   - Minimum $20, maximum $50 per contract
+   - If you can't find 3 good contracts, select 1-2 and allocate less than $100
 
 RESPONSE FORMAT (JSON):
 {

@@ -12,11 +12,11 @@ export async function analyzeContracts(
 ): Promise<AnalysisResponse> {
   console.log(`🤖 Analyzing ${request.contracts.length} contracts with AI (via Vercel AI Gateway)...`);
 
-  if (request.contracts.length < 3) {
+  if (request.contracts.length === 0) {
     return {
       selectedContracts: [],
       totalAllocated: 0,
-      strategyNotes: `Not enough qualifying contracts to select 3 (found ${request.contracts.length}). Skipping today.`,
+      strategyNotes: `No qualifying contracts found today.`,
     };
   }
 
@@ -93,9 +93,9 @@ ${contractsList}
 Analyze these contracts and select exactly 3 contracts to allocate exactly $${request.dailyBudget} across.
 
 Remember:
-- You must select exactly 3 contracts.
-- Total allocation must equal $${request.dailyBudget}.
-- Minimum $30 per contract, maximum $40 per contract.
+- Select up to 3 contracts (1-3).
+- Total allocation must be <= $${request.dailyBudget}.
+- Minimum $20 per contract, maximum $50 per contract.
 - Diversify across uncorrelated events.
 - Consider historical patterns from above.
 - Higher conviction contracts get larger allocations.
@@ -125,36 +125,41 @@ function parseAIResponse(text: string, contracts: Contract[], dailyBudget: numbe
       
       return {
         contract,
-        allocation: Math.min(Math.max(sc.allocation, 30), 40), // Clamp between 30-40
+        allocation: Math.min(Math.max(sc.allocation, 20), 50), // Clamp between 20-50
         confidence: Math.min(Math.max(sc.confidence, 0), 1), // Clamp between 0-1
         reasoning: sc.reasoning || 'No reasoning provided',
         riskFactors: sc.risk_factors || [],
       };
     });
 
-    // Ensure exactly 3 contracts
-    if (selectedContracts.length !== 3) {
-      const snippet = text.length > 1200 ? `${text.slice(0, 1200)}…` : text;
-      throw new Error(`AI must select exactly 3 contracts, got ${selectedContracts.length}. Raw response: ${snippet}`);
+    // Allow 0-3 selections (0 means "no trade today")
+    if (selectedContracts.length > 3) {
+      selectedContracts = selectedContracts.slice(0, 3);
     }
     
     // Normalize allocations to sum to exactly dailyBudget
     const totalAllocated = selectedContracts.reduce((sum: number, sc: any) => sum + sc.allocation, 0);
-    if (Math.abs(totalAllocated - dailyBudget) > 0.01) {
+    // If AI over-allocates, scale down to fit dailyBudget. Otherwise allow under-allocation.
+    if (totalAllocated > dailyBudget && totalAllocated > 0) {
       const scale = dailyBudget / totalAllocated;
       selectedContracts = selectedContracts.map((sc: any) => ({
         ...sc,
         allocation: Math.round(sc.allocation * scale * 100) / 100,
       }));
-      // Adjust last contract to ensure exact total
+      // Adjust last contract to ensure <= dailyBudget (avoid tiny rounding overflow)
       const adjustedTotal = selectedContracts.reduce((sum: number, sc: any) => sum + sc.allocation, 0);
-      selectedContracts[selectedContracts.length - 1].allocation += (dailyBudget - adjustedTotal);
-      selectedContracts[selectedContracts.length - 1].allocation = Math.round(selectedContracts[selectedContracts.length - 1].allocation * 100) / 100;
+      if (adjustedTotal > dailyBudget && selectedContracts.length > 0) {
+        selectedContracts[selectedContracts.length - 1].allocation -= (adjustedTotal - dailyBudget);
+        selectedContracts[selectedContracts.length - 1].allocation = Math.max(
+          0,
+          Math.round(selectedContracts[selectedContracts.length - 1].allocation * 100) / 100
+        );
+      }
     }
 
     return {
       selectedContracts,
-      totalAllocated: dailyBudget,
+      totalAllocated: selectedContracts.reduce((sum: number, sc: any) => sum + sc.allocation, 0),
       strategyNotes: parsed.strategy_notes || 'No strategy notes',
     };
   } catch (error: any) {
