@@ -65,7 +65,7 @@ export async function analyzeContracts(
     throw new Error(`Unexpected response format from Vercel AI Gateway: ${JSON.stringify(data).substring(0, 500)}`);
   }
 
-  const parsed = parseAIResponse(text, request.contracts);
+  const parsed = parseAIResponse(text, request.contracts, request.dailyBudget);
   
   console.log(`   ✅ AI selected ${parsed.selectedContracts.length} contracts`);
   console.log(`   💰 Total allocation: $${parsed.totalAllocated.toFixed(2)}`);
@@ -106,7 +106,7 @@ Remember:
 `.trim();
 }
 
-function parseAIResponse(text: string, contracts: Contract[]): AnalysisResponse {
+function parseAIResponse(text: string, contracts: Contract[], dailyBudget: number): AnalysisResponse {
   // Try to extract JSON from the response
   let jsonText = text;
   
@@ -142,21 +142,21 @@ function parseAIResponse(text: string, contracts: Contract[]): AnalysisResponse 
     
     // Normalize allocations to sum to exactly dailyBudget
     const totalAllocated = selectedContracts.reduce((sum: number, sc: any) => sum + sc.allocation, 0);
-    if (Math.abs(totalAllocated - request.dailyBudget) > 0.01) {
-      const scale = request.dailyBudget / totalAllocated;
+    if (Math.abs(totalAllocated - dailyBudget) > 0.01) {
+      const scale = dailyBudget / totalAllocated;
       selectedContracts = selectedContracts.map((sc: any) => ({
         ...sc,
         allocation: Math.round(sc.allocation * scale * 100) / 100,
       }));
       // Adjust last contract to ensure exact total
       const adjustedTotal = selectedContracts.reduce((sum: number, sc: any) => sum + sc.allocation, 0);
-      selectedContracts[selectedContracts.length - 1].allocation += (request.dailyBudget - adjustedTotal);
+      selectedContracts[selectedContracts.length - 1].allocation += (dailyBudget - adjustedTotal);
       selectedContracts[selectedContracts.length - 1].allocation = Math.round(selectedContracts[selectedContracts.length - 1].allocation * 100) / 100;
     }
 
     return {
       selectedContracts,
-      totalAllocated: request.dailyBudget,
+      totalAllocated: dailyBudget,
       strategyNotes: parsed.strategy_notes || 'No strategy notes',
     };
   } catch (error: any) {

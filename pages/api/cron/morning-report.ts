@@ -61,7 +61,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     
   } catch (error: any) {
     console.error('❌ Morning report failed:', error);
-    const { logCronError } = await import('../../lib/utils/logger');
+    const { logCronError } = await import('../../../lib/utils/logger');
     await logCronError('morning-report', error);
     console.error('⚠️ Daily report failed:', error.message);
     await sendSMS('admin', `⚠️ Daily report failed: ${error.message}`);
