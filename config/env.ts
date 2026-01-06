@@ -3,7 +3,8 @@ import { z } from 'zod';
 const envSchema = z.object({
   // Polymarket
   POLYMARKET_API_KEY: z.string().min(1),
-  POLYMARKET_PRIVATE_KEY: z.string().min(1),
+  POLYMARKET_SECRET: z.string().min(1),
+  POLYMARKET_PASSPHRASE: z.string().min(1),
   POLYMARKET_WALLET_ADDRESS: z.string().optional(),
   
   // Vercel AI Gateway

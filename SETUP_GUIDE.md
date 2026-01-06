@@ -52,7 +52,8 @@ Create a `.env` file in the project root:
 ```bash
 # Polymarket API
 POLYMARKET_API_KEY=your_polymarket_api_key_here
-POLYMARKET_PRIVATE_KEY=your_polymarket_private_key_here
+POLYMARKET_SECRET=your_polymarket_secret_here
+POLYMARKET_PASSPHRASE=your_polymarket_passphrase_here
 POLYMARKET_WALLET_ADDRESS=your_wallet_address_here
 
 # Vercel AI Gateway
@@ -88,7 +89,8 @@ DRY_RUN=true
 
 ```bash
 vercel env add POLYMARKET_API_KEY
-vercel env add POLYMARKET_PRIVATE_KEY
+vercel env add POLYMARKET_SECRET
+vercel env add POLYMARKET_PASSPHRASE
 vercel env add VERCEL_AI_GATEWAY_KEY
 vercel env add SUPABASE_URL
 vercel env add SUPABASE_KEY

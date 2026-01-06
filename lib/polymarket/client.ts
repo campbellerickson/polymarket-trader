@@ -1,14 +1,39 @@
 import { env } from '../../config/env';
 import { Market, Orderbook } from '../../types';
+import crypto from 'crypto';
 
 const POLYMARKET_API_BASE = 'https://clob.polymarket.com';
 
+/**
+ * Create authenticated headers for Polymarket API requests
+ * Polymarket CLOB API uses apiKey, secret, and passphrase for authentication
+ * Similar to Coinbase Pro style authentication
+ */
+function createAuthHeaders(method: string, path: string, body?: string): Record<string, string> {
+  const timestamp = Date.now().toString();
+  const message = timestamp + method.toUpperCase() + path + (body || '');
+  
+  // Create signature using secret (base64 decode first)
+  const secretBuffer = Buffer.from(env.POLYMARKET_SECRET, 'base64');
+  const signature = crypto
+    .createHmac('sha256', secretBuffer)
+    .update(message)
+    .digest('base64');
+  
+  return {
+    'POLY_API_KEY': env.POLYMARKET_API_KEY,
+    'POLY_SIGNATURE': signature,
+    'POLY_TIMESTAMP': timestamp,
+    'POLY_PASSPHRASE': env.POLYMARKET_PASSPHRASE,
+    'Content-Type': 'application/json',
+  };
+}
+
 export async function fetchMarkets(): Promise<Market[]> {
-  const response = await fetch(`${POLYMARKET_API_BASE}/markets`, {
-    headers: {
-      'Authorization': `Bearer ${env.POLYMARKET_API_KEY}`,
-      'Content-Type': 'application/json',
-    },
+  const path = '/markets';
+  const response = await fetch(`${POLYMARKET_API_BASE}${path}`, {
+    method: 'GET',
+    headers: createAuthHeaders('GET', path),
   });
 
   if (!response.ok) {
@@ -34,11 +59,10 @@ export async function fetchMarkets(): Promise<Market[]> {
 }
 
 export async function getMarket(marketId: string): Promise<Market> {
-  const response = await fetch(`${POLYMARKET_API_BASE}/markets/${marketId}`, {
-    headers: {
-      'Authorization': `Bearer ${env.POLYMARKET_API_KEY}`,
-      'Content-Type': 'application/json',
-    },
+  const path = `/markets/${marketId}`;
+  const response = await fetch(`${POLYMARKET_API_BASE}${path}`, {
+    method: 'GET',
+    headers: createAuthHeaders('GET', path),
   });
 
   if (!response.ok) {
@@ -63,11 +87,10 @@ export async function getMarket(marketId: string): Promise<Market> {
 }
 
 export async function getOrderbook(marketId: string): Promise<Orderbook> {
-  const response = await fetch(`${POLYMARKET_API_BASE}/markets/${marketId}/orderbook`, {
-    headers: {
-      'Authorization': `Bearer ${env.POLYMARKET_API_KEY}`,
-      'Content-Type': 'application/json',
-    },
+  const path = `/markets/${marketId}/orderbook`;
+  const response = await fetch(`${POLYMARKET_API_BASE}${path}`, {
+    method: 'GET',
+    headers: createAuthHeaders('GET', path),
   });
 
   if (!response.ok) {
@@ -96,19 +119,18 @@ export async function placeOrder(order: {
     return { id: 'dry-run-order', status: 'filled' };
   }
 
-  const response = await fetch(`${POLYMARKET_API_BASE}/orders`, {
+  const path = '/orders';
+  const body = JSON.stringify({
+    market: order.market,
+    side: order.side,
+    amount: order.amount.toString(),
+    price: order.price.toString(),
+  });
+
+  const response = await fetch(`${POLYMARKET_API_BASE}${path}`, {
     method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${env.POLYMARKET_API_KEY}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      market: order.market,
-      side: order.side,
-      amount: order.amount.toString(),
-      price: order.price.toString(),
-      // Add signature if required by Polymarket API
-    }),
+    headers: createAuthHeaders('POST', path, body),
+    body,
   });
 
   if (!response.ok) {
