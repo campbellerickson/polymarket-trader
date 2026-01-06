@@ -1,11 +1,9 @@
 import { z } from 'zod';
 
 const envSchema = z.object({
-  // Polymarket
-  POLYMARKET_API_KEY: z.string().min(1),
-  POLYMARKET_SECRET: z.string().min(1),
-  POLYMARKET_PASSPHRASE: z.string().min(1),
-  POLYMARKET_WALLET_ADDRESS: z.string().optional(),
+  // Kalshi
+  KALSHI_API_ID: z.string().min(1),
+  KALSHI_PRIVATE_KEY: z.string().min(1), // RSA private key in PEM format
   
   // Vercel AI Gateway
   VERCEL_AI_GATEWAY_KEY: z.string().min(1),

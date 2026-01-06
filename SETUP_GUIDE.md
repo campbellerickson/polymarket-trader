@@ -1,6 +1,6 @@
-# Polymarket Trader - Setup Guide
+# Kalshi Trader - Setup Guide
 
-This guide will walk you through setting up the Polymarket Automated Trading System from scratch.
+This guide will walk you through setting up the Kalshi Automated Trading System from scratch.
 
 ## Prerequisites
 
@@ -27,15 +27,17 @@ npm install
 
 ## Step 3: Get API Keys
 
-### Polymarket API
+### Kalshi API
 
-1. Go to [Polymarket](https://polymarket.com)
+1. Go to [Kalshi](https://kalshi.com)
 2. Create an account and complete KYC if required
-3. Navigate to API settings (or contact Polymarket support for API access)
-4. Generate API key and private key
-5. Note your wallet address
+3. Navigate to Account Settings > API Keys
+4. Click "Create New API Key" to generate:
+   - **API Key ID**: Displayed on screen (starts with format like `id-...`)
+   - **Private Key**: Downloaded as a `.key` file (RSA private key in PEM format)
+5. Save both securely - the private key cannot be retrieved later
 
-**Note**: Polymarket API access may require approval. Check their documentation for current requirements.
+**Note**: Kalshi provides both production and demo environments. Start with demo for testing.
 
 ### Vercel AI Gateway
 
@@ -50,11 +52,10 @@ npm install
 Create a `.env` file in the project root:
 
 ```bash
-# Polymarket API
-POLYMARKET_API_KEY=your_polymarket_api_key_here
-POLYMARKET_SECRET=your_polymarket_secret_here
-POLYMARKET_PASSPHRASE=your_polymarket_passphrase_here
-POLYMARKET_WALLET_ADDRESS=your_wallet_address_here
+# Kalshi API
+KALSHI_API_ID=your_kalshi_api_id_here
+KALSHI_PRIVATE_KEY=-----BEGIN RSA PRIVATE KEY-----\nYour private key content here\n-----END RSA PRIVATE KEY-----
+# Note: For multi-line private key, use \n for newlines or keep as single line
 
 # Vercel AI Gateway
 VERCEL_AI_GATEWAY_KEY=vck_your-vercel-ai-gateway-key-here
@@ -88,9 +89,8 @@ DRY_RUN=true
 4. Add all environment variables to Vercel:
 
 ```bash
-vercel env add POLYMARKET_API_KEY
-vercel env add POLYMARKET_SECRET
-vercel env add POLYMARKET_PASSPHRASE
+vercel env add KALSHI_API_ID
+vercel env add KALSHI_PRIVATE_KEY
 vercel env add VERCEL_AI_GATEWAY_KEY
 vercel env add SUPABASE_URL
 vercel env add SUPABASE_KEY

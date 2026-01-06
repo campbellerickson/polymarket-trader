@@ -1,6 +1,6 @@
-# Polymarket Automated Trading System
+# Kalshi Automated Trading System
 
-An automated trading system for Polymarket prediction markets using AI analysis (Claude) to identify and execute high-probability trades.
+An automated trading system for Kalshi prediction markets using AI analysis (Claude) to identify and execute high-probability trades.
 
 ## Features
 
@@ -28,7 +28,7 @@ Database Logger ← Performance Monitor
 - **Database**: Supabase (PostgreSQL)
 - **AI**: Anthropic Claude API
 - **Notifications**: Twilio (SMS) + SendGrid (Email)
-- **APIs**: Polymarket CLOB API
+- **APIs**: Kalshi Trade API
 
 ## Setup
 

@@ -1,8 +1,8 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { scanContracts } from '../../lib/polymarket/scanner';
+import { scanContracts } from '../../lib/kalshi/scanner';
 import { analyzeContracts } from '../../lib/ai/analyzer';
-import { executeTrades } from '../../lib/polymarket/executor';
-import { checkAndResolveOpenTrades } from '../../lib/polymarket/resolver';
+import { executeTrades } from '../../lib/kalshi/executor';
+import { checkAndResolveOpenTrades } from '../../lib/kalshi/resolver';
 import { monitorStopLosses } from '../../lib/trading/stop-loss';
 import { getRecentTrades, getCurrentBankroll } from '../../lib/database/queries';
 import { sendDailySummary, sendErrorAlert } from '../../lib/utils/notifications';

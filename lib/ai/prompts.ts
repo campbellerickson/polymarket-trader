@@ -1,5 +1,5 @@
 export const TRADING_SYSTEM_PROMPT = `
-You are an expert Polymarket trader analyzing high-probability contracts.
+You are an expert Kalshi trader analyzing high-probability contracts.
 
 Your goal: Select the 3 best contracts from the provided list and allocate $100 total across them.
 

@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { checkAndResolveOpenTrades } from '../../lib/polymarket/resolver';
+import { checkAndResolveOpenTrades } from '../../lib/kalshi/resolver';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.headers.authorization !== `Bearer ${process.env.CRON_SECRET}`) {

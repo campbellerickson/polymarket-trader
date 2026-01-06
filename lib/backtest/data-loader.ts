@@ -1,12 +1,12 @@
 import { HistoricalMarket } from './types';
 
 /**
- * Load historical Polymarket data
+ * Load historical Kalshi data
  * This can be from:
  * - CSV files
  * - JSON files
  * - Database
- * - Polymarket historical API (if available)
+ * - Kalshi historical API (if available)
  */
 export async function loadHistoricalData(
   startDate: Date,
@@ -63,7 +63,7 @@ export async function loadHistoricalDataFromJSON(filePath: string): Promise<Hist
 
 /**
  * Generate sample historical data for testing
- * This creates synthetic data that mimics Polymarket behavior
+ * This creates synthetic data that mimics Kalshi behavior
  */
 export function generateSampleHistoricalData(
   startDate: Date,

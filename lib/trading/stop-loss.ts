@@ -1,5 +1,5 @@
 import { getOpenTrades, getTrade, updateTrade, getRecentStopLosses } from '../database/queries';
-import { getMarket, getOrderbook, placeOrder } from '../polymarket/client';
+import { getMarket, getOrderbook, placeOrder } from '../kalshi/client';
 import { supabase } from '../database/client';
 import { sendSMS } from '../notifications/sms';
 import { Trade, StopLossEvent } from '../../types';

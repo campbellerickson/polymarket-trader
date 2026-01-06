@@ -11,7 +11,7 @@ export async function scanContracts(
     excludeCategories: TRADING_CONSTANTS.EXCLUDE_CATEGORIES,
   }
 ): Promise<Contract[]> {
-  console.log('🔍 Scanning Polymarket for contracts...');
+  console.log('🔍 Scanning Kalshi for contracts...');
   console.log(`   Criteria: ${criteria.minOdds * 100}%-${criteria.maxOdds * 100}% odds, <${criteria.maxDaysToResolution} days, >$${criteria.minLiquidity} liquidity`);
 
   // Fetch all active markets
@@ -29,7 +29,8 @@ export async function scanContracts(
     }
 
     // Filter by odds (we want high probability YES contracts)
-    if (market.yes_odds < criteria.minOdds || market.yes_odds > criteria.maxOdds) {
+    // Note: market.current_odds is already set from client transformation
+    if (market.current_odds < criteria.minOdds || market.current_odds > criteria.maxOdds) {
       continue;
     }
 
@@ -55,7 +56,7 @@ export async function scanContracts(
       market_id: market.market_id,
       question: market.question,
       end_date: market.end_date,
-      current_odds: market.yes_odds,
+      current_odds: market.current_odds,
       liquidity: market.liquidity,
       volume_24h: market.volume_24h,
       discovered_at: new Date(),

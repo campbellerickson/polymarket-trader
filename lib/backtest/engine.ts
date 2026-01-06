@@ -1,5 +1,5 @@
 import { BacktestConfig, BacktestResult, BacktestTrade, HistoricalMarket } from './types';
-import { scanContracts } from '../polymarket/scanner';
+import { scanContracts } from '../kalshi/scanner';
 import { analyzeContracts } from '../ai/analyzer';
 import { loadHistoricalData, generateSampleHistoricalData } from './data-loader';
 

@@ -1,6 +1,6 @@
 import { DailyReportData, Position } from '../../types';
 import { getTradesToday, getTradesInRange, getOpenPositions, getCashBalance, getCurrentBankroll, getInitialBankroll, getBankrollAt } from '../database/queries';
-import { getMarket } from '../polymarket/client';
+import { getMarket } from '../kalshi/client';
 
 export async function generateDailyReport(): Promise<DailyReportData> {
   const today = new Date();
@@ -90,7 +90,7 @@ export function formatReportForSMS(data: DailyReportData): string {
   const emoji = data.mtdPnL >= 0 ? '📈' : '📉';
   
   return `
-${emoji} Polymarket Daily Report - ${data.reportDate.toLocaleDateString()}
+${emoji} Kalshi Daily Report - ${data.reportDate.toLocaleDateString()}
 
 💰 LIQUIDITY
 Cash: $${data.cashBalance.toFixed(2)}
@@ -250,7 +250,7 @@ export function formatReportForEmail(data: DailyReportData): string {
     </div>
     
     <div class="footer">
-      <p>Automated Polymarket Trading System</p>
+      <p>Automated Kalshi Trading System</p>
     </div>
   </div>
 </body>

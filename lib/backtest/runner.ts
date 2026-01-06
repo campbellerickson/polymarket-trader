@@ -25,7 +25,7 @@ async function main() {
     useAI,
   };
   
-  console.log('🚀 Starting Polymarket Backtest\n');
+  console.log('🚀 Starting Kalshi Backtest\n');
   
   const result = await runBacktest(config);
   

@@ -2,7 +2,7 @@ import { sendSMS } from '../notifications/sms';
 import { sendEmail } from '../notifications/email';
 
 export async function sendErrorAlert(error: Error): Promise<void> {
-  const message = `🚨 POLYMARKET TRADER ERROR
+  const message = `🚨 KALSHI TRADER ERROR
 
 ${error.message}
 
@@ -13,7 +13,7 @@ Time: ${new Date().toISOString()}`;
 
   // Log error (notifications removed)
   console.error('🚨 ERROR ALERT:', message);
-  await sendEmail('admin@polymarket-trader.com', '🚨 Polymarket Trader Error', `<pre>${message}</pre>`);
+  await sendEmail('admin@polymarket-trader.com', '🚨 Kalshi Trader Error', `<pre>${message}</pre>`);
 }
 
 export async function sendDailySummary(summary: {
