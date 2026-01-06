@@ -47,6 +47,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     });
   } catch (error: any) {
     console.error('AI test endpoint error:', error);
-    return res.status(500).json({ error: error.message });
+    console.error('Error stack:', error.stack);
+    return res.status(500).json({ 
+      error: error.message,
+      details: process.env.NODE_ENV === 'development' ? error.stack : undefined,
+      hint: error.message.includes('DECODER') ? 'Check KALSHI_PRIVATE_KEY format in Vercel environment variables' : undefined
+    });
   }
 }

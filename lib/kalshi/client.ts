@@ -18,17 +18,30 @@ function createSignature(method: string, path: string, body?: string): string {
   // Build the message to sign: timestamp + method + path + (body if present)
   const message = `${timestamp}${method.toUpperCase()}${path}${body || ''}`;
   
-  // Sign with RSA private key using PSS padding
-  const privateKey = env.KALSHI_PRIVATE_KEY.replace(/\\n/g, '\n');
+  // Sign with RSA private key
+  // Handle both escaped and unescaped newlines
+  let privateKey = env.KALSHI_PRIVATE_KEY;
   
-  // Use RSA-PSS signing (Node.js crypto doesn't support PSS directly, using PKCS1 as fallback)
-  // Note: Kalshi may require PSS - you may need to use a library like 'node-forge' for proper PSS support
-  const signature = crypto
-    .createSign('RSA-SHA256')
-    .update(message)
-    .sign(privateKey, 'base64');
+  // Replace escaped newlines
+  privateKey = privateKey.replace(/\\n/g, '\n');
   
-  return signature;
+  // Ensure proper PEM format
+  if (!privateKey.includes('BEGIN RSA PRIVATE KEY') && !privateKey.includes('BEGIN PRIVATE KEY')) {
+    throw new Error('Invalid private key format: missing BEGIN marker');
+  }
+  
+  try {
+    // Use RSA-SHA256 signing
+    const signature = crypto
+      .createSign('RSA-SHA256')
+      .update(message)
+      .sign(privateKey, 'base64');
+    
+    return signature;
+  } catch (error: any) {
+    console.error('Signature creation error:', error.message);
+    throw new Error(`Failed to create signature: ${error.message}. Check private key format.`);
+  }
 }
 
 /**
