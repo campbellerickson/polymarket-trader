@@ -72,14 +72,26 @@ function createSignature(timestamp: string, method: string, path: string, body?:
     // Kalshi V2 REQUIRES RSA-PSS with:
     // - Padding: PSS
     // - MGF: MGF1 with SHA-256
-    // - Salt Length: MAX_LENGTH (or 32 bytes for SHA-256)
+    // - Salt Length: Must match digest length (32 bytes for SHA-256) OR MAX_LENGTH
     // - Hash: SHA-256
     // Node.js uses RSA_PKCS1_PSS_PADDING constant (not RSA_PSS_PADDING)
-    const signature = crypto.sign('sha256', Buffer.from(message), {
-      key: keyObject,
-      padding: crypto.constants.RSA_PKCS1_PSS_PADDING, // This is the PSS padding constant in Node.js
-      saltLength: crypto.constants.RSA_PSS_SALTLEN_MAX_SIGN, // Use max salt length as per Kalshi docs
-    });
+    // Try DIGEST first (32 bytes = SHA-256 digest length), fallback to MAX_SIGN if needed
+    let signature: Buffer;
+    try {
+      signature = crypto.sign('sha256', Buffer.from(message), {
+        key: keyObject,
+        padding: crypto.constants.RSA_PKCS1_PSS_PADDING,
+        saltLength: crypto.constants.RSA_PSS_SALTLEN_DIGEST, // 32 bytes for SHA-256
+      });
+    } catch (error: any) {
+      // Fallback to MAX_SIGN if DIGEST fails
+      console.warn('RSA-PSS with DIGEST salt length failed, trying MAX_SIGN:', error.message);
+      signature = crypto.sign('sha256', Buffer.from(message), {
+        key: keyObject,
+        padding: crypto.constants.RSA_PKCS1_PSS_PADDING,
+        saltLength: crypto.constants.RSA_PSS_SALTLEN_MAX_SIGN,
+      });
+    }
 
     const signatureBase64 = signature.toString('base64');
     
