@@ -29,21 +29,27 @@ function normalizePemKey(raw: string): string {
 }
 
 function createSignature(timestamp: string, method: string, path: string, body?: string): string {
-  // Kalshi signature includes the full path with query parameters
-  // The path should be exactly as it appears in the request URL
-  // Build the message to sign: timestamp + method + path + (body if present)
-  // According to Kalshi docs: timestamp + HTTP_METHOD + request_path + request_body
-  const message = `${timestamp}${method.toUpperCase()}${path}${body || ''}`;
+  // Kalshi V2 requires: <timestamp_in_ms><METHOD><path_without_params>
+  // Path MUST exclude query parameters for signature
+  // Path should NOT include host (just the path after the base URL)
+  const basePath = path.split('?')[0];
+  
+  // Build the message to sign: timestamp + METHOD + path (without query params) + body (if POST)
+  // Format: <timestamp_in_ms><METHOD><path_without_params>
+  const message = `${timestamp}${method.toUpperCase()}${basePath}${body || ''}`;
 
   // Debug logging (only in non-production)
   if (process.env.NODE_ENV !== 'production' || process.env.DEBUG_AUTH === 'true') {
     console.log('🔐 Signature Debug:', {
       timestamp,
+      timestampLength: timestamp.length,
       method: method.toUpperCase(),
-      path: path,
+      pathWithParams: path,
+      pathWithoutParams: basePath,
       bodyLength: body ? body.length : 0,
       messageLength: message.length,
-      messagePreview: message.substring(0, 100) + (message.length > 100 ? '...' : ''),
+      messagePreview: message.substring(0, 150),
+      messageFull: message, // Full message for debugging
     });
   }
 
@@ -63,11 +69,16 @@ function createSignature(timestamp: string, method: string, path: string, body?:
     // Try RSA-PSS first, fallback to PKCS1 if needed
     const constants: any = (crypto as any).constants;
     
-    // Kalshi uses RSA with PKCS1 padding (not PSS)
-    // Based on Kalshi API documentation and common implementations
+    // Kalshi V2 REQUIRES RSA-PSS with:
+    // - Padding: PSS
+    // - MGF: MGF1 with SHA-256
+    // - Salt Length: MAX_LENGTH (or 32 bytes for SHA-256)
+    // - Hash: SHA-256
+    // Node.js uses RSA_PKCS1_PSS_PADDING constant (not RSA_PSS_PADDING)
     const signature = crypto.sign('sha256', Buffer.from(message), {
       key: keyObject,
-      // Use default PKCS1 padding (no padding option = PKCS1)
+      padding: crypto.constants.RSA_PKCS1_PSS_PADDING, // This is the PSS padding constant in Node.js
+      saltLength: crypto.constants.RSA_PSS_SALTLEN_MAX_SIGN, // Use max salt length as per Kalshi docs
     });
 
     const signatureBase64 = signature.toString('base64');
@@ -95,8 +106,15 @@ function createSignature(timestamp: string, method: string, path: string, body?:
  * Based on official Kalshi API documentation: https://docs.kalshi.com/getting_started/api_keys
  */
 function createAuthHeaders(method: string, path: string, body?: string): Record<string, string> {
-  // Timestamp in milliseconds (as string)
+  // Timestamp MUST be in milliseconds (13 digits), as a string
+  // Example: "1704581200000" (not "1704581200")
   const timestamp = Date.now().toString();
+  
+  // Verify timestamp is 13 digits (milliseconds)
+  if (timestamp.length !== 13) {
+    console.error('⚠️ WARNING: Timestamp is not 13 digits:', timestamp);
+  }
+  
   const signature = createSignature(timestamp, method, path, body);
   
   const headers = {
@@ -111,8 +129,9 @@ function createAuthHeaders(method: string, path: string, body?: string): Record<
     console.log('🔐 Auth Headers:', {
       apiKey: env.KALSHI_API_ID.substring(0, 10) + '...',
       timestamp,
+      timestampLength: timestamp.length,
       signatureLength: signature.length,
-      path,
+      pathWithParams: path,
       method,
     });
   }
