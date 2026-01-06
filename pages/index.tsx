@@ -122,12 +122,6 @@ export default function Dashboard() {
               <div className="card-title">Current total</div>
               <div className="card-value">${data.currentBankroll.toFixed(2)}</div>
             </div>
-            <Link href="#" className="card-action">
-              <span>View detail</span>
-              <svg className="arrow" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7l4-4m0 0l4 4m-4-4v18" />
-              </svg>
-            </Link>
           </div>
           <div className="metric-grid">
             <div className="metric">
@@ -152,7 +146,6 @@ export default function Dashboard() {
               </div>
             )}
           </div>
-          <button className="btn btn-primary">View detail</button>
         </div>
 
         {/* Trade Status Breakdown */}
@@ -162,12 +155,6 @@ export default function Dashboard() {
               <div className="card-title">Current total</div>
               <div className="card-value">{data.totalTrades} Trades</div>
             </div>
-            <Link href="#" className="card-action">
-              <span>View detail</span>
-              <svg className="arrow" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7l4-4m0 0l4 4m-4-4v18" />
-              </svg>
-            </Link>
           </div>
           {totalStatus > 0 && (
             <>
@@ -213,7 +200,6 @@ export default function Dashboard() {
               </div>
             </>
           )}
-          <button className="btn btn-primary">View detail</button>
         </div>
 
         {/* Performance Metrics */}
