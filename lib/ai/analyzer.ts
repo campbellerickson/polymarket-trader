@@ -12,6 +12,14 @@ export async function analyzeContracts(
 ): Promise<AnalysisResponse> {
   console.log(`🤖 Analyzing ${request.contracts.length} contracts with AI (via Vercel AI Gateway)...`);
 
+  if (request.contracts.length < 3) {
+    return {
+      selectedContracts: [],
+      totalAllocated: 0,
+      strategyNotes: `Not enough qualifying contracts to select 3 (found ${request.contracts.length}). Skipping today.`,
+    };
+  }
+
   // Build historical context
   const historicalContext = await buildHistoricalContext();
 
