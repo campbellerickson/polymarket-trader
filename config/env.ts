@@ -25,7 +25,7 @@ const envSchema = z.object({
   MIN_ODDS: z.string().transform(Number).default('0.85'),
   MAX_ODDS: z.string().transform(Number).default('0.98'),
   MAX_DAYS_TO_RESOLUTION: z.string().transform(Number).default('2'),
-  MIN_LIQUIDITY: z.string().transform(Number).default('10000'),
+  MIN_LIQUIDITY: z.string().transform(Number).default('2000'),
   
   // Safety
   DRY_RUN: z.string().transform(v => v === 'true').default('false'),
