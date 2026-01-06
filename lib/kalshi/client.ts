@@ -63,21 +63,12 @@ function createSignature(timestamp: string, method: string, path: string, body?:
     // Try RSA-PSS first, fallback to PKCS1 if needed
     const constants: any = (crypto as any).constants;
     
-    let signature: Buffer;
-    try {
-      // Try RSA-PSS padding (preferred for Kalshi)
-      signature = crypto.sign('sha256', Buffer.from(message), {
-        key: keyObject,
-        padding: constants?.RSA_PSS_PADDING || constants?.RSA_PKCS1_PSS_PADDING,
-        saltLength: constants?.RSA_PSS_SALTLEN_DIGEST || 32,
-      });
-    } catch (pssError: any) {
-      // Fallback to PKCS1 if PSS fails
-      console.warn('RSA-PSS padding failed, trying PKCS1:', pssError.message);
-      signature = crypto.sign('sha256', Buffer.from(message), {
-        key: keyObject,
-      });
-    }
+    // Kalshi uses RSA with PKCS1 padding (not PSS)
+    // Based on Kalshi API documentation and common implementations
+    const signature = crypto.sign('sha256', Buffer.from(message), {
+      key: keyObject,
+      // Use default PKCS1 padding (no padding option = PKCS1)
+    });
 
     const signatureBase64 = signature.toString('base64');
     
