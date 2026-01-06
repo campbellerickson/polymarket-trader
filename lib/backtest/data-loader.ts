@@ -74,19 +74,19 @@ export function generateSampleHistoricalData(
   const dayMs = 24 * 60 * 60 * 1000;
   
   for (let i = 0; i < numMarkets; i++) {
-    const marketStart = new Date(startDate.getTime() + Math.random() * (endDate.getTime() - startDate.getTime()));
+    const marketStart: Date = new Date(startDate.getTime() + Math.random() * (endDate.getTime() - startDate.getTime()));
     const daysToResolution = 1 + Math.random() * 3; // 1-4 days
-    const endDate = new Date(marketStart.getTime() + daysToResolution * dayMs);
+    const marketEndDate: Date = new Date(marketStart.getTime() + daysToResolution * dayMs);
     
     const initialOdds = 0.85 + Math.random() * 0.13; // 85-98%
-    const resolved = endDate < new Date();
+    const resolved = marketEndDate < new Date();
     const outcome = resolved ? (Math.random() > 0.1 ? 'YES' : 'NO') : undefined;
     
     // Generate hourly odds snapshots
     const historical_odds = [];
     let currentOdds = initialOdds;
     const startTime = marketStart.getTime();
-    const endTime = endDate.getTime();
+    const endTime = marketEndDate.getTime();
     
     for (let time = startTime; time < endTime; time += 60 * 60 * 1000) { // Every hour
       // Random walk for odds
@@ -105,11 +105,11 @@ export function generateSampleHistoricalData(
     markets.push({
       market_id: `market-${i}`,
       question: `Sample Market ${i}: Will X happen?`,
-      end_date: endDate,
+      end_date: marketEndDate,
       historical_odds,
       resolved,
       outcome,
-      resolved_at: resolved ? endDate : undefined,
+      resolved_at: resolved ? marketEndDate : undefined,
     });
   }
   

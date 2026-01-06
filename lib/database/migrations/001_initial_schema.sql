@@ -122,6 +122,24 @@ CREATE INDEX idx_performance_date ON performance_metrics(date);
 CREATE INDEX idx_stop_loss_trade ON stop_loss_events(trade_id);
 CREATE INDEX idx_stop_loss_executed_at ON stop_loss_events(executed_at);
 
+-- Error logs table
+CREATE TABLE error_logs (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  timestamp TIMESTAMP DEFAULT NOW(),
+  level TEXT NOT NULL, -- 'error', 'warning', 'info'
+  message TEXT NOT NULL,
+  error TEXT,
+  stack TEXT,
+  context JSONB,
+  source TEXT, -- 'cron', 'api', 'system'
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- Create indexes for error logs
+CREATE INDEX idx_error_logs_timestamp ON error_logs(timestamp);
+CREATE INDEX idx_error_logs_level ON error_logs(level);
+CREATE INDEX idx_error_logs_source ON error_logs(source);
+
 -- Insert default stop loss config
 INSERT INTO stop_loss_config (trigger_threshold, enabled) 
 VALUES (0.80, true);

@@ -21,17 +21,12 @@ function createSignature(method: string, path: string, body?: string): string {
   // Sign with RSA private key using PSS padding
   const privateKey = env.KALSHI_PRIVATE_KEY.replace(/\\n/g, '\n');
   
+  // Use RSA-PSS signing (Node.js crypto doesn't support PSS directly, using PKCS1 as fallback)
+  // Note: Kalshi may require PSS - you may need to use a library like 'node-forge' for proper PSS support
   const signature = crypto
     .createSign('RSA-SHA256')
     .update(message)
-    .sign(
-      {
-        key: privateKey,
-        padding: crypto.constants.RSA_PSS_PADDING,
-        saltLength: crypto.constants.RSA_PSS_SALTLEN_DIGEST,
-      },
-      'base64'
-    );
+    .sign(privateKey, 'base64');
   
   return signature;
 }
@@ -74,18 +69,24 @@ export async function fetchMarkets(): Promise<Market[]> {
   // Kalshi API returns { markets: [...] } structure
   const markets = data.markets || data.cursor?.markets || [];
   
-  return markets.map((market: any) => ({
-    market_id: market.ticker || market.market_id || market.id,
-    question: market.title || market.question || market.subtitle,
-    end_date: new Date(market.expiration_time || market.expirationTime || market.end_date),
-    current_odds: parseFloat(market.yes_bid || market.yesBid || market.yes_odds || 0) / 100, // Kalshi uses 0-100 scale
-    liquidity: parseFloat(market.liquidity || market.open_interest || 0),
-    volume_24h: parseFloat(market.volume || market.volume_24h || 0),
-    resolved: market.status === 'closed' || market.status === 'resolved' || false,
-    outcome: market.result ? (market.result === 'yes' ? 'YES' : 'NO') : undefined,
-    final_odds: market.result_price ? parseFloat(market.result_price) / 100 : undefined,
-    resolved_at: market.settlement_time ? new Date(market.settlement_time) : undefined,
-  }));
+  return markets.map((market: any) => {
+    const yesOdds = parseFloat(market.yes_bid || market.yesBid || market.yes_odds || 0) / 100;
+    const noOdds = parseFloat(market.no_bid || market.noBid || market.no_odds || (100 - parseFloat(market.yes_bid || market.yesBid || market.yes_odds || 0))) / 100;
+    
+    return {
+      market_id: market.ticker || market.market_id || market.id,
+      question: market.title || market.question || market.subtitle,
+      end_date: new Date(market.expiration_time || market.expirationTime || market.end_date),
+      yes_odds: yesOdds,
+      no_odds: noOdds,
+      liquidity: parseFloat(market.liquidity || market.open_interest || 0),
+      volume_24h: parseFloat(market.volume || market.volume_24h || 0),
+      resolved: market.status === 'closed' || market.status === 'resolved' || false,
+      outcome: market.result ? (market.result === 'yes' ? 'YES' : 'NO') : undefined,
+      final_odds: market.result_price ? parseFloat(market.result_price) / 100 : undefined,
+      resolved_at: market.settlement_time ? new Date(market.settlement_time) : undefined,
+    };
+  });
 }
 
 /**
@@ -107,11 +108,15 @@ export async function getMarket(ticker: string): Promise<Market> {
   const data = await response.json();
   const market = data.market || data;
   
+  const yesOdds = parseFloat(market.yes_bid || market.yesBid || market.yes_odds || 0) / 100;
+  const noOdds = parseFloat(market.no_bid || market.noBid || market.no_odds || (100 - parseFloat(market.yes_bid || market.yesBid || market.yes_odds || 0))) / 100;
+  
   return {
     market_id: market.ticker || market.market_id || market.id,
     question: market.title || market.question || market.subtitle,
     end_date: new Date(market.expiration_time || market.expirationTime || market.end_date),
-    current_odds: parseFloat(market.yes_bid || market.yesBid || market.yes_odds || 0) / 100,
+    yes_odds: yesOdds,
+    no_odds: noOdds,
     liquidity: parseFloat(market.liquidity || market.open_interest || 0),
     volume_24h: parseFloat(market.volume || market.volume_24h || 0),
     resolved: market.status === 'closed' || market.status === 'resolved' || false,

@@ -29,8 +29,8 @@ export async function scanContracts(
     }
 
     // Filter by odds (we want high probability YES contracts)
-    // Note: market.current_odds is already set from client transformation
-    if (market.current_odds < criteria.minOdds || market.current_odds > criteria.maxOdds) {
+    // Use yes_odds for filtering
+    if (market.yes_odds < criteria.minOdds || market.yes_odds > criteria.maxOdds) {
       continue;
     }
 
@@ -56,7 +56,7 @@ export async function scanContracts(
       market_id: market.market_id,
       question: market.question,
       end_date: market.end_date,
-      current_odds: market.current_odds,
+      current_odds: market.yes_odds, // Use yes_odds for Contract
       liquidity: market.liquidity,
       volume_24h: market.volume_24h,
       discovered_at: new Date(),

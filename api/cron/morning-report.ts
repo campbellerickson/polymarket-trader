@@ -61,8 +61,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     
   } catch (error: any) {
     console.error('❌ Morning report failed:', error);
-    
-    // Log error (notifications removed)
+    const { logCronError } = await import('../../lib/utils/logger');
+    await logCronError('morning-report', error);
     console.error('⚠️ Daily report failed:', error.message);
     await sendSMS('admin', `⚠️ Daily report failed: ${error.message}`);
     

@@ -2,6 +2,8 @@ import { DailyReportData, Position } from '../../types';
 import { getTradesToday, getTradesInRange, getOpenPositions, getCashBalance, getCurrentBankroll, getInitialBankroll, getBankrollAt } from '../database/queries';
 import { getMarket } from '../kalshi/client';
 
+export type { DailyReportData };
+
 export async function generateDailyReport(): Promise<DailyReportData> {
   const today = new Date();
   today.setHours(0, 0, 0, 0);

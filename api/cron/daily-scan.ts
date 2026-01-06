@@ -14,11 +14,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
   
+  let contracts: any[] = [];
+  
   try {
     console.log('🔍 Starting daily scan...');
     
     // 1. Scan for contracts
-    const contracts = await scanContracts({
+    contracts = await scanContracts({
       minOdds: TRADING_CONSTANTS.MIN_ODDS,
       maxOdds: TRADING_CONSTANTS.MAX_ODDS,
       maxDaysToResolution: TRADING_CONSTANTS.MAX_DAYS_TO_RESOLUTION,
@@ -69,6 +71,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     
   } catch (error: any) {
     console.error('❌ Cron job failed:', error);
+    const { logCronError } = await import('../../lib/utils/logger');
+    await logCronError('daily-scan', error, { contracts_analyzed: contracts?.length });
     await sendErrorAlert(error);
     return res.status(500).json({ error: error.message });
   }

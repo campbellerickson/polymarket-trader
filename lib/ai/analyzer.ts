@@ -39,7 +39,7 @@ export async function analyzeContracts(
     throw new Error(`Vercel AI Gateway error: ${response.status} ${response.statusText} - ${errorText}`);
   }
 
-  const data = await response.json();
+  const data: any = await response.json();
   
   // Parse response - Vercel AI Gateway returns Anthropic-compatible format
   // Response can be in different formats depending on gateway configuration
@@ -47,7 +47,7 @@ export async function analyzeContracts(
   
   if (data.content && Array.isArray(data.content) && data.content[0]) {
     // Anthropic format: { content: [{ type: 'text', text: '...' }] }
-    const content = data.content[0];
+    const content: any = data.content[0];
     text = content.text || content.content || '';
   } else if (data.text) {
     // Direct text format
