@@ -1,7 +1,7 @@
-import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { monitorStopLosses, checkCircuitBreaker } from '../../lib/trading/stop-loss';
+import type { NextApiRequest, NextApiResponse } from 'next';
+import { monitorStopLosses, checkCircuitBreaker } from "../../../lib/trading/stop-loss';
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.headers.authorization !== `Bearer ${process.env.CRON_SECRET}`) {
     return res.status(401).json({ error: 'Unauthorized' });
   }

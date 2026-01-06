@@ -1,14 +1,14 @@
-import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { scanContracts } from '../../lib/kalshi/scanner';
-import { analyzeContracts } from '../../lib/ai/analyzer';
-import { executeTrades } from '../../lib/kalshi/executor';
-import { checkAndResolveOpenTrades } from '../../lib/kalshi/resolver';
-import { monitorStopLosses } from '../../lib/trading/stop-loss';
-import { getRecentTrades, getCurrentBankroll } from '../../lib/database/queries';
-import { sendDailySummary, sendErrorAlert } from '../../lib/utils/notifications';
-import { TRADING_CONSTANTS } from '../../config/constants';
+import type { NextApiRequest, NextApiResponse } from 'next';
+import { scanContracts } from "../../../lib/kalshi/scanner';
+import { analyzeContracts } from "../../../lib/ai/analyzer';
+import { executeTrades } from "../../../lib/kalshi/executor';
+import { checkAndResolveOpenTrades } from "../../../lib/kalshi/resolver';
+import { monitorStopLosses } from "../../../lib/trading/stop-loss';
+import { getRecentTrades, getCurrentBankroll } from "../../../lib/database/queries';
+import { sendDailySummary, sendErrorAlert } from "../../../lib/utils/notifications';
+import { TRADING_CONSTANTS } from "../../../config/constants';
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   // Verify cron secret
   if (req.headers.authorization !== `Bearer ${process.env.CRON_SECRET}`) {
     return res.status(401).json({ error: 'Unauthorized' });

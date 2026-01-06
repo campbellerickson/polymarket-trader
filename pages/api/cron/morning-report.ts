@@ -1,13 +1,13 @@
-import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { generateDailyReport } from '../../lib/notifications/report';
-import { getNotificationPreferences } from '../../lib/database/queries';
-import { sendDailyReportSMS } from '../../lib/notifications/sms';
-import { sendDailyReportEmail } from '../../lib/notifications/email';
-import { sendSMS } from '../../lib/notifications/sms';
-import { supabase } from '../../lib/database/client';
-import { formatReportForSMS } from '../../lib/notifications/report';
+import type { NextApiRequest, NextApiResponse } from 'next';
+import { generateDailyReport } from "../../../lib/notifications/report';
+import { getNotificationPreferences } from "../../../lib/database/queries';
+import { sendDailyReportSMS } from "../../../lib/notifications/sms';
+import { sendDailyReportEmail } from "../../../lib/notifications/email';
+import { sendSMS } from "../../../lib/notifications/sms';
+import { supabase } from "../../../lib/database/client';
+import { formatReportForSMS } from "../../../lib/notifications/report';
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.headers.authorization !== `Bearer ${process.env.CRON_SECRET}`) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
