@@ -3,7 +3,9 @@ import { AnalysisRequest, AnalysisResponse, Contract } from '../../types';
 import { TRADING_SYSTEM_PROMPT } from './prompts';
 import { buildHistoricalContext } from './learning';
 
-const VERCEL_AI_GATEWAY_URL = 'https://api.vercel.ai/v1/messages';
+// Vercel AI Gateway (OpenAI-compatible API)
+// Docs: https://vercel.com/docs/ai-gateway/openai-compat
+const VERCEL_AI_GATEWAY_URL = 'https://ai-gateway.vercel.sh/v1/chat/completions';
 
 export async function analyzeContracts(
   request: AnalysisRequest
@@ -24,13 +26,13 @@ export async function analyzeContracts(
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      model: 'anthropic/claude-sonnet-4-20250514',
+      // AI Gateway supports model IDs like 'anthropic/claude-sonnet-4'
+      model: 'anthropic/claude-sonnet-4',
       max_tokens: 4000,
-      system: TRADING_SYSTEM_PROMPT,
-      messages: [{
-        role: 'user',
-        content: prompt
-      }]
+      messages: [
+        { role: 'system', content: TRADING_SYSTEM_PROMPT },
+        { role: 'user', content: prompt },
+      ],
     })
   });
 
@@ -40,26 +42,12 @@ export async function analyzeContracts(
   }
 
   const data: any = await response.json();
-  
-  // Parse response - Vercel AI Gateway returns Anthropic-compatible format
-  // Response can be in different formats depending on gateway configuration
-  let text: string;
-  
-  if (data.content && Array.isArray(data.content) && data.content[0]) {
-    // Anthropic format: { content: [{ type: 'text', text: '...' }] }
-    const content: any = data.content[0];
-    text = content.text || content.content || '';
-  } else if (data.text) {
-    // Direct text format
-    text = data.text;
-  } else if (typeof data === 'string') {
-    // String response
-    text = data;
-  } else {
-    // Try to extract from nested structure
-    text = JSON.stringify(data);
-    console.warn('Unexpected response format, attempting to parse:', JSON.stringify(data).substring(0, 200));
-  }
+
+  // Parse OpenAI-compatible response: { choices: [{ message: { content: "..." } }] }
+  const text: string =
+    data?.choices?.[0]?.message?.content ??
+    data?.choices?.[0]?.text ??
+    (typeof data === 'string' ? data : '');
   
   if (!text || text.trim().length === 0) {
     throw new Error(`Unexpected response format from Vercel AI Gateway: ${JSON.stringify(data).substring(0, 500)}`);
