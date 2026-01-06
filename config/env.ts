@@ -1,5 +1,6 @@
 import { z } from 'zod';
 
+// Allow either SUPABASE_KEY or SUPABASE_SERVICE_ROLE_KEY (some dashboards set the latter)
 const envSchema = z.object({
   // Kalshi
   KALSHI_API_ID: z.string().min(1),
@@ -10,7 +11,8 @@ const envSchema = z.object({
   
   // Database
   SUPABASE_URL: z.string().url(),
-  SUPABASE_KEY: z.string().min(1),
+  SUPABASE_KEY: z.string().min(1).optional(),
+  SUPABASE_SERVICE_ROLE_KEY: z.string().min(1).optional(),
   
   // Security
   CRON_SECRET: z.string().min(1),
@@ -27,12 +29,21 @@ const envSchema = z.object({
   INITIAL_BANKROLL: z.string().transform(Number).default('1000'),
 });
 
-export type Env = z.infer<typeof envSchema>;
+type ParsedEnv = z.infer<typeof envSchema>;
+export type Env = Omit<ParsedEnv, 'SUPABASE_SERVICE_ROLE_KEY'> & { SUPABASE_KEY: string };
 
 export function validateEnv(): Env {
   try {
-    return envSchema.parse(process.env);
-  } catch (error) {
+    const parsed = envSchema.parse(process.env);
+    const supabaseKey = parsed.SUPABASE_KEY || parsed.SUPABASE_SERVICE_ROLE_KEY;
+    if (!supabaseKey) {
+      throw new Error('Missing SUPABASE_KEY (or SUPABASE_SERVICE_ROLE_KEY)');
+    }
+    return {
+      ...parsed,
+      SUPABASE_KEY: supabaseKey,
+    };
+  } catch (error: any) {
     if (error instanceof z.ZodError) {
       const missing = error.errors.map(e => e.path.join('.')).join(', ');
       throw new Error(`Missing or invalid environment variables: ${missing}`);
