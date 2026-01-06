@@ -2,7 +2,7 @@ import { env } from '../../config/env';
 import { Market, Orderbook } from '../../types';
 import crypto from 'crypto';
 
-const KALSHI_API_BASE = 'https://api.elections.kalshi.com/trade-api/v2';
+export const KALSHI_API_BASE = 'https://api.elections.kalshi.com/trade-api/v2';
 
 /**
  * Create signature for Kalshi API authentication
@@ -117,7 +117,7 @@ function createSignature(timestamp: string, method: string, path: string, body?:
  * Create authenticated headers for Kalshi API requests
  * Based on official Kalshi API documentation: https://docs.kalshi.com/getting_started/api_keys
  */
-function createAuthHeaders(method: string, path: string, body?: string): Record<string, string> {
+export function createAuthHeaders(method: string, path: string, body?: string): Record<string, string> {
   // Timestamp MUST be in milliseconds (13 digits), as a string
   // Example: "1704581200000" (not "1704581200")
   const timestamp = Date.now().toString();
@@ -156,7 +156,7 @@ function createAuthHeaders(method: string, path: string, body?: string): Record<
  * Handles field migration: checks yes_bid (integer cents) first, then yes_bid_dollars (float)
  * Works both before and after January 15, 2026
  */
-function extractYesBidCents(market: any): number | null {
+export function extractYesBidCents(market: any): number | null {
   // Primary: yes_bid as integer cents (pre-Jan 15, 2026 and post-migration)
   if (typeof market.yes_bid === 'number') {
     return Math.round(market.yes_bid);
@@ -185,16 +185,28 @@ function extractYesBidCents(market: any): number | null {
 }
 
 /**
- * Fetch all active markets with cursor-based pagination
- * Uses Filter-then-Fetch approach: gets all markets first, then enriches with orderbook
+ * Sleep/delay helper for rate limiting
  */
-export async function fetchAllMarkets(): Promise<Market[]> {
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+/**
+ * Fetch all active markets with cursor-based pagination and rate limiting
+ * Uses Filter-then-Fetch approach: gets all markets first, then enriches with orderbook
+ * Rate limited: 2 requests per second max (500ms delay between requests)
+ */
+export async function fetchAllMarkets(options?: {
+  rateLimitMs?: number; // Delay between requests (default 500ms = 2 req/sec)
+  maxPages?: number;
+}): Promise<Market[]> {
   const allMarkets: any[] = [];
   let cursor: string | null = null;
   let pageCount = 0;
-  const maxPages = 100; // Safety limit
+  const rateLimitMs = options?.rateLimitMs ?? 500; // Default 500ms = 2 req/sec (safe)
+  const maxPages = options?.maxPages ?? 100; // Safety limit
 
-  console.log('🔍 Fetching all active markets from Kalshi (with pagination)...');
+  console.log(`🔍 Fetching all active markets from Kalshi (with pagination, ${rateLimitMs}ms rate limit)...`);
 
   do {
     pageCount++;
@@ -216,6 +228,15 @@ export async function fetchAllMarkets(): Promise<Market[]> {
       });
 
       if (!response.ok) {
+        // Handle rate limiting gracefully
+        if (response.status === 429) {
+          const retryAfter = response.headers.get('Retry-After');
+          const waitTime = retryAfter ? parseInt(retryAfter) * 1000 : 5000; // Default 5 seconds
+          console.warn(`⚠️ Rate limited (429). Waiting ${waitTime}ms before retry...`);
+          await sleep(waitTime);
+          continue; // Retry this page
+        }
+        
         const errorText = await response.text();
         throw new Error(`Kalshi API error: ${response.status} ${response.statusText} - ${errorText}`);
       }
@@ -235,7 +256,19 @@ export async function fetchAllMarkets(): Promise<Market[]> {
       if (!cursor || markets.length === 0) {
         break;
       }
+      
+      // Rate limit: wait before next request (except for last page)
+      if (cursor && markets.length > 0) {
+        await sleep(rateLimitMs);
+      }
     } catch (error: any) {
+      // If rate limited, wait and retry
+      if (error.message.includes('429') || error.message.includes('rate')) {
+        console.warn(`⚠️ Rate limit error. Waiting ${rateLimitMs * 2}ms before retry...`);
+        await sleep(rateLimitMs * 2);
+        continue; // Retry this page
+      }
+      
       console.error(`Error fetching markets page ${pageCount}:`, error.message);
       throw error;
     }

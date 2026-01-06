@@ -1,20 +1,24 @@
 {
   "crons": [
     {
-      "path": "/api/cron/morning-report",
+      "path": "/pages/api/cron/morning-report",
       "schedule": "0 7 * * *"
     },
     {
-      "path": "/api/cron/daily-scan",
+      "path": "/pages/api/cron/daily-scan",
       "schedule": "0 8 * * *"
     },
     {
-      "path": "/api/cron/stop-loss",
+      "path": "/pages/api/cron/stop-loss",
       "schedule": "0 */2 * * *"
     },
     {
-      "path": "/api/cron/check-resolutions",
+      "path": "/pages/api/cron/check-resolutions",
       "schedule": "0 */6 * * *"
+    },
+    {
+      "path": "/pages/api/cron/refresh-markets",
+      "schedule": "*/5 * * * *"
     }
   ],
   "framework": "nextjs",

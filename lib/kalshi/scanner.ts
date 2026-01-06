@@ -1,4 +1,5 @@
-import { fetchAllMarkets, getOrderbookWithLiquidity, calculateDaysToResolution } from './client';
+import { getOrderbookWithLiquidity, calculateDaysToResolution } from './client';
+import { getCachedMarkets } from './cache';
 import { Contract, ScanCriteria, Market } from '../../types';
 import { TRADING_CONSTANTS } from '../../config/constants';
 
@@ -20,9 +21,15 @@ export async function scanContracts(
   console.log('🔍 Scanning Kalshi for high-conviction contracts...');
   console.log(`   Criteria: ${criteria.minOdds * 100}%-${criteria.maxOdds * 100}% odds, <${criteria.maxDaysToResolution} days, >$${criteria.minLiquidity} liquidity`);
 
-  // STEP 1: Fetch all active markets (with pagination)
-  const allMarkets = await fetchAllMarkets();
-  console.log(`   ✅ Fetched ${allMarkets.length} total markets`);
+  // STEP 1: Get markets from cache (refreshed gradually via cron)
+  // This avoids hitting rate limits by fetching all markets at once
+  const allMarkets = await getCachedMarkets();
+  console.log(`   ✅ Retrieved ${allMarkets.length} markets from cache`);
+  
+  if (allMarkets.length === 0) {
+    console.warn('⚠️ No cached markets found. Market refresh cron may not have run yet.');
+    return [];
+  }
 
   // STEP 2: Filter for high-conviction markets
   // Keep only markets where yes price is >85 cents OR <15 cents
