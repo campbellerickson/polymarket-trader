@@ -29,8 +29,26 @@ function normalizePemKey(raw: string): string {
 }
 
 function createSignature(timestamp: string, method: string, path: string, body?: string): string {
+  // Normalize path: remove query parameters for signature (Kalshi signs the base path only)
+  // Query params are sent in the request but not included in signature
+  const basePath = path.split('?')[0];
+  
   // Build the message to sign: timestamp + method + path + (body if present)
-  const message = `${timestamp}${method.toUpperCase()}${path}${body || ''}`;
+  // According to Kalshi docs: timestamp + HTTP_METHOD + request_path + request_body
+  const message = `${timestamp}${method.toUpperCase()}${basePath}${body || ''}`;
+
+  // Debug logging (only in non-production)
+  if (process.env.NODE_ENV !== 'production' || process.env.DEBUG_AUTH === 'true') {
+    console.log('🔐 Signature Debug:', {
+      timestamp,
+      method: method.toUpperCase(),
+      path: basePath,
+      fullPath: path,
+      bodyLength: body?.length || 0,
+      messageLength: message.length,
+      messagePreview: message.substring(0, 100) + (message.length > 100 ? '...' : ''),
+    });
+  }
 
   const privateKeyPem = normalizePemKey(env.KALSHI_PRIVATE_KEY);
   if (
@@ -44,18 +62,42 @@ function createSignature(timestamp: string, method: string, path: string, body?:
   try {
     const keyObject = crypto.createPrivateKey(privateKeyPem);
 
-    // Kalshi docs specify RSA-PSS; Node supports this via RSA_PKCS1_PSS_PADDING.
-    // Use a cast to avoid TS/lib typing mismatches across runtimes.
+    // Kalshi uses RSA-PSS with SHA-256
+    // Try RSA-PSS first, fallback to PKCS1 if needed
     const constants: any = (crypto as any).constants;
+    
+    let signature: Buffer;
+    try {
+      // Try RSA-PSS padding (preferred for Kalshi)
+      signature = crypto.sign('sha256', Buffer.from(message), {
+        key: keyObject,
+        padding: constants?.RSA_PSS_PADDING || constants?.RSA_PKCS1_PSS_PADDING,
+        saltLength: constants?.RSA_PSS_SALTLEN_DIGEST || 32,
+      });
+    } catch (pssError: any) {
+      // Fallback to PKCS1 if PSS fails
+      console.warn('RSA-PSS padding failed, trying PKCS1:', pssError.message);
+      signature = crypto.sign('sha256', Buffer.from(message), {
+        key: keyObject,
+      });
+    }
 
-    const signature = crypto.sign('sha256', Buffer.from(message), {
-      key: keyObject,
-      padding: constants?.RSA_PKCS1_PSS_PADDING,
-      saltLength: constants?.RSA_PSS_SALTLEN_DIGEST,
-    });
+    const signatureBase64 = signature.toString('base64');
+    
+    if (process.env.NODE_ENV !== 'production' || process.env.DEBUG_AUTH === 'true') {
+      console.log('🔐 Signature created:', {
+        signatureLength: signatureBase64.length,
+        signaturePreview: signatureBase64.substring(0, 20) + '...',
+      });
+    }
 
-    return signature.toString('base64');
+    return signatureBase64;
   } catch (error: any) {
+    console.error('❌ Signature creation error:', {
+      error: error.message,
+      stack: error.stack,
+      keyFormat: privateKeyPem.substring(0, 50) + '...',
+    });
     throw new Error(`Failed to create signature: ${error?.message || String(error)}. Check KALSHI_PRIVATE_KEY format.`);
   }
 }
@@ -65,16 +107,29 @@ function createSignature(timestamp: string, method: string, path: string, body?:
  * Based on official Kalshi API documentation: https://docs.kalshi.com/getting_started/api_keys
  */
 function createAuthHeaders(method: string, path: string, body?: string): Record<string, string> {
-  // Timestamp in milliseconds
+  // Timestamp in milliseconds (as string)
   const timestamp = Date.now().toString();
   const signature = createSignature(timestamp, method, path, body);
   
-  return {
+  const headers = {
     'KALSHI-ACCESS-KEY': env.KALSHI_API_ID,
     'KALSHI-ACCESS-TIMESTAMP': timestamp,
     'KALSHI-ACCESS-SIGNATURE': signature,
     'Content-Type': 'application/json',
   };
+
+  // Debug logging
+  if (process.env.NODE_ENV !== 'production' || process.env.DEBUG_AUTH === 'true') {
+    console.log('🔐 Auth Headers:', {
+      apiKey: env.KALSHI_API_ID.substring(0, 10) + '...',
+      timestamp,
+      signatureLength: signature.length,
+      path,
+      method,
+    });
+  }
+
+  return headers;
 }
 
 /**

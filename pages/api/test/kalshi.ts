@@ -7,6 +7,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(401).json({ error: 'Unauthorized' });
   }
 
+  // Enable debug logging for this test
+  process.env.DEBUG_AUTH = 'true';
+
   const testResults: any = {
     timestamp: new Date().toISOString(),
     tests: {},
