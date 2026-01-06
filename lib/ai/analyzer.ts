@@ -116,7 +116,8 @@ function parseAIResponse(text: string, contracts: Contract[], dailyBudget: numbe
     const parsed = JSON.parse(jsonText);
     
     // Map market_ids to contracts
-    let selectedContracts = parsed.selected_contracts.map((sc: any) => {
+    const selectedRaw: any[] = Array.isArray(parsed.selected_contracts) ? parsed.selected_contracts : [];
+    let selectedContracts = selectedRaw.map((sc: any) => {
       const contract = contracts.find(c => c.market_id === sc.market_id);
       if (!contract) {
         throw new Error(`Contract not found: ${sc.market_id}`);
@@ -133,7 +134,8 @@ function parseAIResponse(text: string, contracts: Contract[], dailyBudget: numbe
 
     // Ensure exactly 3 contracts
     if (selectedContracts.length !== 3) {
-      throw new Error(`AI must select exactly 3 contracts, got ${selectedContracts.length}`);
+      const snippet = text.length > 1200 ? `${text.slice(0, 1200)}…` : text;
+      throw new Error(`AI must select exactly 3 contracts, got ${selectedContracts.length}. Raw response: ${snippet}`);
     }
     
     // Normalize allocations to sum to exactly dailyBudget
