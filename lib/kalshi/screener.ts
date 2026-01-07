@@ -222,16 +222,7 @@ export class KalshiMarketScreener {
     for (const market of rawMarkets) {
       stats.totalProcessed++;
       // Note: All markets from Phase 1 are already filtered to status='open' by the API
-      // Check status (case-insensitive) to handle variations like 'open', 'Open', 'OPEN'
-      const marketStatus = (market.status || '').toLowerCase();
-      if (marketStatus !== 'open') {
-        stats.skippedNotOpen++;
-        if (stats.skippedNotOpen <= 5) {
-          // Only log first 5 for debugging
-          console.warn(`   ⚠️ Market ${market.ticker || 'unknown'} has unexpected status: ${market.status} (expected 'open')`);
-        }
-        continue;
-      }
+      // No need to check status again - API has already filtered to only open markets
       
       // Extract pricing
       let yesBidDollars = 0;
