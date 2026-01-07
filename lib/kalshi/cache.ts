@@ -266,7 +266,13 @@ export async function refreshMarketPage(cursor?: string): Promise<{
 
     // Convert to Market format using the same logic as fetchAllMarkets
     // Filter out complex markets that don't have simple yes/no questions
-    const marketObjects = rawMarkets.map((market: any, index: number): Market | null => {
+    const marketObjects = rawMarkets
+      .filter((market: any) => {
+        // Only process markets with 'open' status
+        // Skip 'unopened', 'closed', 'settled', etc.
+        return market.status === 'open' || market.status === 'Open' || market.status === 'OPEN';
+      })
+      .map((market: any, index: number): Market | null => {
       // Debug: Log first market structure to understand SDK format
       if (index < 3) {
         console.log(`   🔍 Market ${index + 1} from SDK:`, JSON.stringify({
