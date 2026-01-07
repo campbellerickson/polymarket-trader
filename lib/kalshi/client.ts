@@ -485,14 +485,12 @@ export async function placeOrder(order: {
     type: orderType, // 'market' for immediate fills, 'limit' for price control
   };
 
-  // Set price only for limit orders (market orders don't need price)
-  if (orderType === 'limit') {
-    // Set price based on side (yes_price for yes side, no_price for no side)
-    if (side === 'yes') {
-      orderRequest.yes_price = orderPrice; // Price in cents (1-99)
-    } else {
-      orderRequest.no_price = orderPrice; // Price in cents (1-99)
-    }
+  // IMPORTANT: Kalshi requires price parameter even for market orders!
+  // Set price based on side (yes_price for yes side, no_price for no side)
+  if (side === 'yes') {
+    orderRequest.yes_price = orderPrice; // Price in cents (1-99)
+  } else {
+    orderRequest.no_price = orderPrice; // Price in cents (1-99)
   }
 
   try {
