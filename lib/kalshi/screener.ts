@@ -202,9 +202,26 @@ export class KalshiMarketScreener {
     const filtered: ScreenedMarket[] = [];
     const now = new Date();
     
+    // Debug: Track filtering statistics
+    let stats = {
+      totalProcessed: 0,
+      skippedNotOpen: 0,
+      skippedNoPricing: 0,
+      skipped100Percent: 0,
+      skippedLowConviction: 0,
+      skippedComplex: 0,
+      skippedLowVolume: 0,
+      skippedLowOpenInterest: 0,
+      skippedSpread: 0,
+      skippedInvalidDate: 0,
+      skippedDaysToResolution: 0,
+    };
+    
     for (const market of rawMarkets) {
+      stats.totalProcessed++;
       // Skip if not active/open
       if (market.status !== 'open' && market.status !== 'active') {
+        stats.skippedNotOpen++;
         continue;
       }
       
@@ -226,11 +243,13 @@ export class KalshiMarketScreener {
       
       // Skip markets with no pricing
       if (yesBidDollars === 0 && noBidDollars === 0) {
+        stats.skippedNoPricing++;
         continue;
       }
       
       // Skip markets at 100% (no profit potential)
       if (yesBidDollars >= 0.999 || noBidDollars >= 0.999) {
+        stats.skipped100Percent++;
         continue;
       }
       
@@ -244,30 +263,35 @@ export class KalshiMarketScreener {
         noOddsPercent <= ((1 - TRADING_CONSTANTS.MAX_ODDS) * 100);
       
       if (!isHighConviction) {
+        stats.skippedLowConviction++;
         continue;
       }
       
       // Filter by simple yes/no question
       const question = market.title || market.question || market.subtitle || '';
       if (!isSimpleYesNoMarket(question)) {
+        stats.skippedComplex++;
         continue;
       }
       
       // Filter by volume
       const volume24h = parseFloat(market.volume_24h || market.volume || 0);
       if (volume24h < minVolume) {
+        stats.skippedLowVolume++;
         continue;
       }
       
       // Filter by open interest
       const openInterest = parseFloat(market.liquidity || market.open_interest || 0);
       if (openInterest < minOpenInterest) {
+        stats.skippedLowOpenInterest++;
         continue;
       }
       
       // Calculate spread (only filter if maxSpread is provided)
       const spreadCents = calculateSpreadCents(market);
       if (maxSpread !== undefined && spreadCents > maxSpread) {
+        stats.skippedSpread++;
         continue;
       }
       
@@ -277,14 +301,17 @@ export class KalshiMarketScreener {
         const expirationTime = market.expected_expiration_time || market.expiration_time || market.close_time || market.end_date;
         endDate = new Date(expirationTime);
         if (isNaN(endDate.getTime())) {
+          stats.skippedInvalidDate++;
           continue; // Skip invalid dates
         }
       } catch (e) {
+        stats.skippedInvalidDate++;
         continue;
       }
       
       const daysToResolution = calculateDaysToResolution(endDate);
       if (daysToResolution > maxDays || daysToResolution < 0) {
+        stats.skippedDaysToResolution++;
         continue;
       }
       
@@ -315,6 +342,20 @@ export class KalshiMarketScreener {
     }
     
     console.log(`   ✅ Phase 2 Complete: ${filtered.length} markets passed basic filters`);
+    console.log(`   📊 Filtering stats:`, {
+      totalProcessed: stats.totalProcessed,
+      skippedNotOpen: stats.skippedNotOpen,
+      skippedNoPricing: stats.skippedNoPricing,
+      skipped100Percent: stats.skipped100Percent,
+      skippedLowConviction: stats.skippedLowConviction,
+      skippedComplex: stats.skippedComplex,
+      skippedLowVolume: stats.skippedLowVolume,
+      skippedLowOpenInterest: stats.skippedLowOpenInterest,
+      skippedSpread: stats.skippedSpread,
+      skippedInvalidDate: stats.skippedInvalidDate,
+      skippedDaysToResolution: stats.skippedDaysToResolution,
+      passed: filtered.length,
+    });
     return filtered;
   }
 
