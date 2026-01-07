@@ -96,13 +96,15 @@ ${contractsList}
 
 Analyze these contracts and select 0-3 contracts based on quality.
 
-STRATEGY: HYPER-CONSERVATIVE
-- Be extremely selective - quality over quantity
-- Only select contracts with LOW VARIANCE and stable, predictable outcomes
-- Reject volatile markets (sports, crypto price thresholds, weather)
-- Favor process-driven, calendar-driven, or administrative outcomes
-- You CAN select 0 contracts if nothing meets high standards
-- You CAN select up to 3 if multiple excellent opportunities exist
+STRATEGY: YIELD FARMING (OVERPRICED TAIL RISK)
+- Markets OVERPRICE black swan risk due to fear and recency bias
+- When odds show 90/10, true odds are often more like 95-98/2-5
+- Your job: Research to find where 10% tail risk is really only 2-5%
+- Target: Markets at 90%+ where tail risk is fear-based, not reality-based
+- These are chaotic markets, but VARIANCE ≠ UNCERTAINTY
+- Favor: Volatile markets where research reveals outcome is clearer than odds suggest
+- You CAN select 0 contracts if tail risk seems fairly priced
+- You CAN select up to 3 if multiple clear overpriced tail risk opportunities exist
 
 IMPORTANT: For EVERY contract (both selected AND rejected), provide reasoning.
 
@@ -127,16 +129,17 @@ Return JSON in this format:
 }
 
 Guidelines:
-- Select 0-3 contracts (only trade when quality is exceptional)
-- You are the steward of this capital - allocate based on your confidence
+- Select 0-3 contracts (only trade when tail risk is clearly overpriced)
+- You are the steward of this capital - allocate based on your conviction
 - Daily budget available: $${request.dailyBudget} (you do NOT need to use it all)
-- Allocate what you're comfortable with - more allocation = more confidence
+- Allocate based on edge: higher allocation = more confident tail risk is overpriced
 - Suggested range: $10-50 per contract (but use your judgment)
-- Prioritize LOW VARIANCE over high odds
-- Reject volatile/unpredictable outcomes
-- Favor stable, process-driven markets
-- Consider historical patterns from above
-- BE SPECIFIC about rejection reasons
+- Prioritize RESEARCH QUALITY - identify when 10% tail is really 2%
+- Embrace volatile markets - variance creates fear-based mispricing
+- Look for markets where fear exceeds reality (overpriced black swan risk)
+- Target >10:1 odds (>90% probability markets) where tail risk is inflated
+- Consider historical base rates - how often do these "surprises" actually happen?
+- BE SPECIFIC about why tail risk is overpriced and your edge
 `.trim();
 }
 
