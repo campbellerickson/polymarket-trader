@@ -495,10 +495,14 @@ export async function placeOrder(order: {
       }
     }
 
+    console.log('   📤 Sending order request:', JSON.stringify(orderRequest, null, 2));
+
     const response = await ordersApi.createOrder(orderRequest);
 
     return (response.data as any).order || response.data;
   } catch (error: any) {
+    console.error('   ❌ Order request failed:', JSON.stringify(orderRequest, null, 2));
+    console.error('   ❌ Error response:', JSON.stringify(error.response?.data, null, 2));
     const errorMessage = error.response?.data?.error?.message || error.message || 'Unknown error';
     const statusCode = error.response?.status || 500;
     throw new Error(`Failed to place order: ${statusCode} ${errorMessage}`);
