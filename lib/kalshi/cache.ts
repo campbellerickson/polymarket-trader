@@ -265,10 +265,17 @@ export async function refreshMarketPage(cursor?: string): Promise<{
     const nextCursor = response.data.cursor || null;
 
     // Convert to Market format using robust pricing logic
+    const rawCount = rawMarkets.length;
+    console.log(`   📊 Processing ${rawCount} markets from API...`);
+    
     const marketObjects = rawMarkets
       .filter((market: any) => {
         // Strict filter for open markets only
-        return market.status === 'open' || market.status === 'Open' || market.status === 'OPEN';
+        const isOpen = market.status === 'open' || market.status === 'Open' || market.status === 'OPEN';
+        if (!isOpen && rawMarkets.indexOf(market) < 3) {
+          console.log(`   ⚠️ Market ${rawMarkets.indexOf(market) + 1} filtered by status: ${market.status}`);
+        }
+        return isOpen;
       })
       .map((market: any, index: number): Market | null => {
         
@@ -308,8 +315,15 @@ export async function refreshMarketPage(cursor?: string): Promise<{
         // 4. DEAD MARKET FILTER
         // Only discard if there is absolutely NO data (no bid, no ask, no last price)
         if (bid === 0 && ask === 0 && last === 0) {
-           // console.log(`Skipping dead market: ${market.ticker}`);
+           if (index < 5) {
+             console.log(`   🚫 Dead market ${index + 1}: ${market.ticker} (bid=${bid}, ask=${ask}, last=${last})`);
+           }
            return null;
+        }
+        
+        // Debug: Log first few markets with pricing
+        if (index < 3) {
+          console.log(`   ✅ Market ${index + 1} has pricing: ${market.ticker} (bid=${bid}, ask=${ask}, last=${last}, yes=${(yesOdds*100).toFixed(1)}%, no=${(noOdds*100).toFixed(1)}%)`);
         }
 
         // 5. PARSE DATES & METADATA
@@ -334,6 +348,9 @@ export async function refreshMarketPage(cursor?: string): Promise<{
         
         // Filter out complex markets
         if (!isSimpleYesNoMarket(question)) {
+          if (index < 5) {
+            console.log(`   🔀 Complex market ${index + 1} filtered: ${market.ticker.substring(0, 50)}...`);
+          }
           return null;
         }
 
@@ -353,6 +370,9 @@ export async function refreshMarketPage(cursor?: string): Promise<{
         };
       })
       .filter((market): market is Market => market !== null);
+    
+    const openCount = rawMarkets.filter((m: any) => m.status === 'open' || m.status === 'Open' || m.status === 'OPEN').length;
+    console.log(`   📊 After filtering: ${openCount} open markets, ${marketObjects.length} markets with pricing data`);
 
     // Cache the markets
     await cacheMarkets(marketObjects);
