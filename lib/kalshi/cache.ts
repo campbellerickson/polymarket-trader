@@ -93,12 +93,23 @@ export async function getCachedMarkets(): Promise<Market[]> {
   // Convert DB format to Market format
   return data.map((row: any) => {
     // Handle both old format (current_odds) and new format (yes_odds, no_odds)
-    const yesOdds = row.yes_odds !== undefined 
-      ? parseFloat(row.yes_odds.toString()) 
-      : (row.current_odds !== undefined ? parseFloat(row.current_odds.toString()) : 0);
-    const noOdds = row.no_odds !== undefined
-      ? parseFloat(row.no_odds.toString())
-      : (1 - yesOdds);
+    let yesOdds = 0;
+    let noOdds = 0;
+    
+    // Try to get yes_odds
+    if (row.yes_odds !== undefined && row.yes_odds !== null) {
+      yesOdds = parseFloat(String(row.yes_odds));
+    } else if (row.current_odds !== undefined && row.current_odds !== null) {
+      yesOdds = parseFloat(String(row.current_odds));
+    }
+    
+    // Try to get no_odds
+    if (row.no_odds !== undefined && row.no_odds !== null) {
+      noOdds = parseFloat(String(row.no_odds));
+    } else {
+      // Calculate from yes_odds if available
+      noOdds = yesOdds > 0 ? (1 - yesOdds) : 0;
+    }
     
     return {
       market_id: row.market_id,
