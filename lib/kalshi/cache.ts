@@ -268,8 +268,8 @@ export async function refreshMarketPage(cursor?: string): Promise<{
     // Filter out complex markets that don't have simple yes/no questions
     const marketObjects = rawMarkets.map((market: any, index: number): Market | null => {
       // Debug: Log first market structure to understand SDK format
-      if (index === 0) {
-        console.log('   🔍 Sample market from SDK:', JSON.stringify({
+      if (index < 3) {
+        console.log(`   🔍 Market ${index + 1} from SDK:`, JSON.stringify({
           ticker: market.ticker,
           yes_bid: market.yes_bid,
           yes_bid_dollars: market.yes_bid_dollars,
@@ -277,7 +277,10 @@ export async function refreshMarketPage(cursor?: string): Promise<{
           yes_ask_dollars: market.yes_ask_dollars,
           last_price: market.last_price,
           yes_price: market.yes_price,
-          keys: Object.keys(market).filter(k => k.includes('yes') || k.includes('price') || k.includes('bid') || k.includes('ask')),
+          status: market.status,
+          extractedYesBidCents: extractYesBidCents(market),
+          allKeys: Object.keys(market),
+          priceRelatedKeys: Object.keys(market).filter(k => k.toLowerCase().includes('price') || k.toLowerCase().includes('bid') || k.toLowerCase().includes('ask') || k.toLowerCase().includes('yes')),
         }, null, 2));
       }
       
@@ -287,7 +290,11 @@ export async function refreshMarketPage(cursor?: string): Promise<{
       const noOdds = yesBidCents !== null && yesBidCents > 0 ? (100 - yesBidCents) / 100 : 0;
       
       // Skip markets with 0 odds (likely inactive or not yet priced)
+      // BUT log first few to debug
       if (yesOdds === 0 && noOdds === 0) {
+        if (index < 3) {
+          console.log(`   ⚠️ Market ${index + 1} has 0 odds - skipping:`, market.ticker, `(extracted: ${extractYesBidCents(market)})`);
+        }
         return null; // Skip this market
       }
       
