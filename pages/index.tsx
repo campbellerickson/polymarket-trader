@@ -107,6 +107,7 @@ export default function Dashboard() {
             <div className="nav-links">
               <Link href="/" className="active">Dashboard</Link>
               <Link href="/logs">Logs</Link>
+              <Link href="/docs">Docs</Link>
             </div>
           </nav>
         </div>

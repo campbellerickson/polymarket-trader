@@ -57,6 +57,7 @@ export default function Logs() {
             <div className="nav-links">
               <Link href="/">Dashboard</Link>
               <Link href="/logs" className="active">Logs</Link>
+              <Link href="/docs">Docs</Link>
             </div>
           </nav>
         </div>

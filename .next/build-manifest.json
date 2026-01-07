@@ -5,37 +5,44 @@
   "devFiles": [],
   "ampDevFiles": [],
   "lowPriorityFiles": [
-    "static/z0o_JkQNxvkurZcgCV7Tx/_buildManifest.js",
-    "static/z0o_JkQNxvkurZcgCV7Tx/_ssgManifest.js"
+    "static/wJXNzIpBPO1Qmp1D6lM4f/_buildManifest.js",
+    "static/wJXNzIpBPO1Qmp1D6lM4f/_ssgManifest.js"
   ],
   "rootMainFiles": [],
   "pages": {
     "/": [
-      "static/chunks/webpack-8fa1640cc84ba8fe.js",
+      "static/chunks/webpack-ee7e63bc15b31913.js",
       "static/chunks/framework-64ad27b21261a9ce.js",
       "static/chunks/main-4b423ec82b590a3f.js",
       "static/chunks/996-80bd74c565659df8.js",
-      "static/chunks/pages/index-4e024ca730ec79a7.js"
+      "static/chunks/pages/index-1309759be0fd1717.js"
     ],
     "/_app": [
-      "static/chunks/webpack-8fa1640cc84ba8fe.js",
+      "static/chunks/webpack-ee7e63bc15b31913.js",
       "static/chunks/framework-64ad27b21261a9ce.js",
       "static/chunks/main-4b423ec82b590a3f.js",
       "static/css/2c6ecc82ed8c9591.css",
       "static/chunks/pages/_app-26f5890917895004.js"
     ],
     "/_error": [
-      "static/chunks/webpack-8fa1640cc84ba8fe.js",
+      "static/chunks/webpack-ee7e63bc15b31913.js",
       "static/chunks/framework-64ad27b21261a9ce.js",
       "static/chunks/main-4b423ec82b590a3f.js",
       "static/chunks/pages/_error-7a92967bea80186d.js"
     ],
-    "/logs": [
-      "static/chunks/webpack-8fa1640cc84ba8fe.js",
+    "/docs": [
+      "static/chunks/webpack-ee7e63bc15b31913.js",
       "static/chunks/framework-64ad27b21261a9ce.js",
       "static/chunks/main-4b423ec82b590a3f.js",
       "static/chunks/996-80bd74c565659df8.js",
-      "static/chunks/pages/logs-cdc121601b7b4332.js"
+      "static/chunks/pages/docs-75686f83cbcba22e.js"
+    ],
+    "/logs": [
+      "static/chunks/webpack-ee7e63bc15b31913.js",
+      "static/chunks/framework-64ad27b21261a9ce.js",
+      "static/chunks/main-4b423ec82b590a3f.js",
+      "static/chunks/996-80bd74c565659df8.js",
+      "static/chunks/pages/logs-495294440339b45b.js"
     ]
   },
   "ampFirstPages": []

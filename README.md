@@ -4,65 +4,111 @@ An automated trading system for Kalshi prediction markets using AI analysis (Cla
 
 ## Features
 
-- 🤖 **AI-Powered Analysis**: Uses Claude Sonnet 4.5 to analyze contracts and make trading decisions
-- 📊 **Automated Scanning**: Daily scans for high-probability contracts (90-98% odds)
-- 💰 **Smart Position Sizing**: Kelly criterion-based position sizing
+- 🤖 **AI-Powered Analysis**: Uses Claude via Vercel AI Gateway to analyze contracts and make trading decisions
+- 📊 **Automated Scanning**: Daily scans for high-probiction contracts (85-98% odds)
+- 💰 **Smart Position Sizing**: Allocates up to $100/day across 1-3 contracts
 - 🛡️ **Stop Loss Protection**: Automatic stop loss at 80% odds threshold
-- 📈 **Performance Tracking**: Comprehensive metrics and daily reports
-- 📱 **Daily Reports**: SMS/Email reports with MTD/YTD performance
-- 🧪 **Backtesting**: Test strategies against historical data
-
-## Architecture
-
-```
-Vercel Cron Jobs
-    ↓
-Contract Scanner → AI Analyzer → Trade Executor
-    ↓                                    ↓
-Database Logger ← Performance Monitor
-```
-
-## Tech Stack
-
-- **Runtime**: Vercel Serverless Functions (Node.js/TypeScript)
-- **Database**: Supabase (PostgreSQL)
-- **AI**: Anthropic Claude API
-- **Notifications**: Twilio (SMS) + SendGrid (Email)
-- **APIs**: Kalshi Trade API
-
-## Setup
-
-See [SETUP_GUIDE.md](./SETUP_GUIDE.md) for detailed setup instructions.
+- 📈 **Performance Tracking**: Comprehensive metrics, monthly analysis, and learning system
+- 🔄 **Market Caching**: Efficient market data caching to avoid rate limits
+- 📱 **Dashboard**: Real-time performance dashboard and documentation viewer
 
 ## Quick Start
 
-1. Clone the repository
-2. Install dependencies: `npm install`
-3. Set up environment variables (see SETUP_GUIDE.md)
-4. Run database migrations
-5. Deploy to Vercel: `vercel --prod`
+1. **Clone & Install**
+   ```bash
+   git clone https://github.com/campbellerickson/kalshi-trader.git
+   cd kalshi-trader
+   npm install
+   ```
 
-## Backtesting
+2. **Set Up Environment Variables**
+   - See `SETUP_GUIDE.md` for complete list
+   - Required: Kalshi API keys, Supabase credentials, Vercel AI Gateway key
 
-Run backtests against historical data:
+3. **Run Database Migrations**
+   - Copy `RUN_MIGRATION.sql` to Supabase Dashboard → SQL Editor
+   - Or run `MIGRATIONS_COMPLETE.sql` for full schema
 
-```bash
-npm run backtest [start-date] [end-date] [initial-bankroll] [use-ai]
+4. **Deploy to Vercel**
+   ```bash
+   vercel --prod
+   ```
+
+## Documentation
+
+- **[Architecture Docs](./docs/ARCHITECTURE.md)** - Complete system documentation
+- **[Setup Guide](./SETUP_GUIDE.md)** - Detailed setup instructions
+- **[Project Structure](./PROJECT_STRUCTURE.md)** - Codebase organization
+- **[View Docs in Dashboard](https://your-app.vercel.app/docs)** - Interactive documentation viewer
+
+## Tech Stack
+
+- **Runtime**: Next.js 14 (Vercel Serverless Functions)
+- **Database**: Supabase (PostgreSQL)
+- **AI**: Anthropic Claude via Vercel AI Gateway
+- **Trading API**: Kalshi Trade API v2 (official TypeScript SDK)
+- **Authentication**: RSA-PSS signatures (handled by SDK)
+
+## Project Structure
+
+```
+kalshi-trader/
+├── config/          # Configuration (constants, env)
+├── lib/             # Core logic
+│   ├── ai/         # AI analysis & learning
+│   ├── kalshi/     # Kalshi API integration
+│   ├── database/   # Database layer
+│   └── trading/    # Trading logic
+├── pages/          # Next.js pages & API routes
+├── docs/           # Documentation
+└── scripts/        # Utility scripts
 ```
 
-Example:
+See [PROJECT_STRUCTURE.md](./PROJECT_STRUCTURE.md) for details.
+
+## API Endpoints
+
+### Trading (Protected)
+- `POST /api/cron/daily-scan` - Main trading cycle (daily at 8 AM)
+- `POST /api/cron/stop-loss` - Monitor positions (every 2 hours)
+- `POST /api/cron/refresh-markets` - Market cache refresh (every 5 min)
+
+### Testing
+- `GET /api/test/kalshi` - Test Kalshi API integration
+- `GET /api/test/ai` - Test AI analysis
+- `GET /api/test/qualifying-contracts` - Show qualifying contracts breakdown
+
+### Dashboard
+- `GET /api/dashboard` - Dashboard data
+- `GET /api/logs` - Error logs
+
+## Trading Parameters
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| Daily Budget | $100 | Maximum daily investment |
+| Min Odds | 85% | Minimum odds for YES side |
+| Max Odds | 98% | Maximum odds (risk limit) |
+| Max Days to Resolution | 2 | Only trade contracts expiring soon |
+| Min Liquidity | $2,000 | Minimum orderbook depth |
+| Stop Loss Threshold | 80% | Sell if odds drop below |
+
+## Development
+
 ```bash
-npm run backtest 2024-01-01 2024-12-31 1000 true
+# Install dependencies
+npm install
+
+# Run development server
+npm run dev
+
+# Build for production
+npm run build
+
+# Run tests
+npm test
 ```
-
-## Cron Jobs
-
-- **Morning Report**: 7 AM ET daily
-- **Daily Scan**: 11 AM ET daily
-- **Stop Loss Check**: Every 2 hours
-- **Resolution Check**: Every 6 hours
 
 ## License
 
 MIT
-
