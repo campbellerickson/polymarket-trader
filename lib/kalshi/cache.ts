@@ -1,6 +1,6 @@
 import { supabase } from '../database/client';
 import { Market } from '../../types';
-import { extractYesBidCents, getMarketApi, getOrderbookWithLiquidity } from './client';
+import { getMarketApi } from './client';
 import { MarketApi } from 'kalshi-typescript';
 
 /**
@@ -264,9 +264,8 @@ export async function refreshMarketPage(cursor?: string): Promise<{
     const rawMarkets = response.data.markets || [];
     const nextCursor = response.data.cursor || null;
 
-    // Convert to Market format using two-step approach:
-    // Step 1: Get all open market tickers (already filtered by status='open' in API call)
-    // Step 2: Fetch orderbook for each to get real bid/ask pricing
+    // Convert to Market format using yes_bid_dollars and no_bid_dollars
+    // Simple approach: use the dollar values directly to get odds
     const rawCount = rawMarkets.length;
     console.log(`   📊 Processing ${rawCount} open markets from API...`);
     
@@ -278,60 +277,51 @@ export async function refreshMarketPage(cursor?: string): Promise<{
     
     console.log(`   📊 Found ${openMarkets.length} open markets to process...`);
     
-    // Process markets and enrich with orderbook data
+    // Process markets using yes_bid_dollars and no_bid_dollars
     const marketObjects: Market[] = [];
     
     for (let index = 0; index < openMarkets.length; index++) {
       const market = openMarkets[index];
       
       try {
-        // STEP 2: Fetch orderbook to get real bid/ask pricing
-        // Open markets should have orderbook data
-        let yesOdds = 0;
-        let noOdds = 0;
-        let liquidity = 0;
+        // Extract yes_bid_dollars and no_bid_dollars
+        // These are strings like "0.85" representing dollars (0-1 range)
+        let yesBidDollars = 0;
+        let noBidDollars = 0;
         
-        try {
-          const { orderbook: orderbookData, liquidity: orderbookLiquidity } = await getOrderbookWithLiquidity(market.ticker || market.market_id || market.id);
-          
-          // Get best bids from orderbook (in cents: 0-100)
-          const yesBidCents = orderbookData.bestYesBid * 100;
-          const noBidCents = orderbookData.bestNoBid * 100;
-          
-          // Use whichever side has pricing
-          if (yesBidCents > 0) {
-            yesOdds = yesBidCents / 100;
-            noOdds = 1 - yesOdds;
-          } else if (noBidCents > 0) {
-            noOdds = noBidCents / 100;
-            yesOdds = 1 - noOdds;
-          } else {
-            // No bids on either side - skip this market
-            if (index < 5) {
-              console.log(`   ⚠️ Market ${index + 1} has no orderbook bids: ${market.ticker}`);
-            }
-            continue; // Skip to next market
-          }
-          
-          liquidity = orderbookLiquidity;
-          
-          if (index < 3) {
-            console.log(`   ✅ Market ${index + 1}: ${market.ticker} - yes=${(yesOdds*100).toFixed(1)}%, no=${(noOdds*100).toFixed(1)}%, liquidity=${liquidity}`);
-          }
-          
-          // Rate limit: wait 200ms between orderbook calls
-          if (index < openMarkets.length - 1) {
-            await new Promise(resolve => setTimeout(resolve, 200));
-          }
-        } catch (error: any) {
-          // If orderbook fetch fails, skip this market
+        // Parse yes_bid_dollars
+        if (typeof market.yes_bid_dollars === 'string') {
+          yesBidDollars = parseFloat(market.yes_bid_dollars) || 0;
+        } else if (typeof market.yes_bid_dollars === 'number') {
+          yesBidDollars = market.yes_bid_dollars;
+        }
+        
+        // Parse no_bid_dollars
+        if (typeof market.no_bid_dollars === 'string') {
+          noBidDollars = parseFloat(market.no_bid_dollars) || 0;
+        } else if (typeof market.no_bid_dollars === 'number') {
+          noBidDollars = market.no_bid_dollars;
+        }
+        
+        // Convert to odds (0-1 range)
+        // yes_bid_dollars is already in 0-1 range (e.g., 0.85 = 85%)
+        const yesOdds = yesBidDollars;
+        const noOdds = noBidDollars;
+        
+        // Debug: Log first few markets
+        if (index < 5) {
+          console.log(`   🔍 Market ${index + 1}: ${market.ticker} - yes_bid_dollars=${market.yes_bid_dollars}, no_bid_dollars=${market.no_bid_dollars}, yesOdds=${(yesOdds*100).toFixed(1)}%, noOdds=${(noOdds*100).toFixed(1)}%`);
+        }
+        
+        // Skip markets with no pricing at all
+        if (yesOdds === 0 && noOdds === 0) {
           if (index < 5) {
-            console.log(`   ⚠️ Failed to fetch orderbook for ${market.ticker}: ${error.message}`);
+            console.log(`   ⚠️ Market ${index + 1} has no bid pricing: ${market.ticker}`);
           }
           continue;
         }
 
-        // 3. PARSE DATES & METADATA
+        // PARSE DATES & METADATA
         let endDate: Date;
         try {
           // SDK uses various fields for expiration
@@ -354,9 +344,9 @@ export async function refreshMarketPage(cursor?: string): Promise<{
         // Filter out complex markets
         if (!isSimpleYesNoMarket(question)) {
           if (index < 5) {
-            console.log(`   🔀 Complex market ${index + 1} filtered: ${market.ticker.substring(0, 50)}...`);
+            console.log(`   🔀 Complex market ${index + 1} filtered: ${market.ticker?.substring(0, 50)}...`);
           }
-          return null;
+          continue;
         }
 
         // Add market to our list
@@ -366,7 +356,7 @@ export async function refreshMarketPage(cursor?: string): Promise<{
           end_date: endDate,
           yes_odds: yesOdds,
           no_odds: noOdds,
-          liquidity: liquidity,
+          liquidity: parseFloat(market.liquidity || market.open_interest || 0),
           volume_24h: parseFloat(market.volume_24h || market.volume || 0),
           resolved: resolved,
           category: market.category || market.event_ticker || undefined,
