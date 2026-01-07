@@ -70,13 +70,142 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     // Step 2: Find qualifying contract
     try {
-    console.log(`🔍 Searching for contract with >${MIN_YES_ODDS * 100}% yes odds...`);
-    const allMarkets = await getCachedMarkets();
-    
-    if (allMarkets.length === 0) {
-      result.error = 'No cached markets found. Market refresh cron may not have run yet.';
-      return res.status(400).json(result);
-    }
+      console.log(`🔍 Searching for contract with >${MIN_YES_ODDS * 100}% yes odds...`);
+      const allMarkets = await getCachedMarkets();
+      
+      console.log(`   Found ${allMarkets.length} cached markets`);
+      
+      if (allMarkets.length === 0) {
+        // Try fetching markets directly from API as fallback for testing
+        console.log('   ⚠️ No cached markets found. Attempting direct API fetch...');
+        const { fetchAllMarkets } = await import('../../../lib/kalshi/client');
+        const directMarkets = await fetchAllMarkets();
+        console.log(`   ✅ Fetched ${directMarkets.length} markets directly from API`);
+        
+        // Use first 50 for testing to avoid rate limits
+        const marketsToUse = directMarkets.slice(0, 50);
+        
+        if (marketsToUse.length === 0) {
+          result.error = 'No markets available (cached or direct fetch).';
+          return res.status(400).json(result);
+        }
+        
+        // Update candidates to use direct markets
+        result.steps.marketSearch = {
+          success: true,
+          source: 'direct_api_fetch',
+          totalMarkets: directMarkets.length,
+          marketsUsed: marketsToUse.length,
+        };
+        
+        // Continue with direct markets
+        const candidates: Market[] = [];
+        
+        for (const market of marketsToUse) {
+          // Same filtering logic as below
+          if (!market.yes_odds || market.yes_odds === 0 || market.yes_odds === null) {
+            continue;
+          }
+
+          if (market.yes_odds < MIN_YES_ODDS) {
+            continue;
+          }
+
+          const daysToResolution = calculateDaysToResolution(market.end_date);
+          if (daysToResolution > 2 || daysToResolution < 0) {
+            continue;
+          }
+
+          if (market.resolved) {
+            continue;
+          }
+
+          candidates.push(market);
+        }
+
+        if (candidates.length === 0) {
+          result.error = `No qualifying contracts found in direct fetch (need >${MIN_YES_ODDS * 100}% yes odds, <2 days to resolution)`;
+          return res.status(404).json(result);
+        }
+
+        // Pick random candidate and continue with order execution
+        const selectedMarket = candidates[Math.floor(Math.random() * candidates.length)];
+        console.log(`   ✅ Selected: ${selectedMarket.market_id} - ${selectedMarket.question.substring(0, 50)}...`);
+        console.log(`      Yes Odds: ${(selectedMarket.yes_odds * 100).toFixed(1)}%`);
+
+        result.selectedMarket = {
+          market_id: selectedMarket.market_id,
+          question: selectedMarket.question,
+          yes_odds: selectedMarket.yes_odds,
+          end_date: selectedMarket.end_date,
+        };
+
+        // Continue to orderbook check (same as below)
+        // ... (rest of the code will handle order execution)
+        
+        // Jump to orderbook check
+        try {
+          console.log(`📊 Checking orderbook for ${selectedMarket.market_id}...`);
+          const { orderbook, liquidity, side } = await getOrderbookWithLiquidity(selectedMarket.market_id);
+          
+          result.steps.orderbookCheck = {
+            success: true,
+            liquidity,
+            side,
+            bestYesBid: orderbook.bestYesBid,
+            bestYesAsk: orderbook.bestYesAsk,
+          };
+
+          if (liquidity < MIN_LIQUIDITY) {
+            result.error = `Insufficient liquidity: ${liquidity} contracts < ${MIN_LIQUIDITY} required`;
+            return res.status(400).json(result);
+          }
+
+          console.log(`   ✅ Liquidity: ${liquidity} contracts available`);
+          console.log(`   Best Yes Ask: ${(orderbook.bestYesAsk * 100).toFixed(1)}¢`);
+
+          // Execute order (same as below)
+          const contractPrice = orderbook.bestYesAsk || selectedMarket.yes_odds;
+          const contractsToBuy = calculateContractAmount(TEST_AMOUNT, contractPrice);
+          
+          console.log(`💵 Executing order...`);
+          console.log(`   Amount: $${TEST_AMOUNT}`);
+          console.log(`   Price per contract: ${(contractPrice * 100).toFixed(1)}¢`);
+          console.log(`   Contracts to buy: ${contractsToBuy.toFixed(2)}`);
+
+          const order = await placeOrder({
+            market: selectedMarket.market_id,
+            side: 'YES',
+            amount: contractsToBuy,
+            price: contractPrice,
+          });
+
+          result.steps.orderExecution = {
+            success: true,
+            orderId: order.order_id || order.id,
+            orderStatus: order.status,
+            contracts: contractsToBuy,
+            price: contractPrice,
+            totalCost: TEST_AMOUNT,
+            orderDetails: order,
+          };
+
+          result.success = true;
+          console.log(`   ✅ Order placed successfully!`);
+          console.log(`      Order ID: ${order.order_id || order.id}`);
+          console.log(`      Status: ${order.status}`);
+
+          return res.status(200).json(result);
+        } catch (error: any) {
+          result.steps.orderbookCheck = {
+            success: false,
+            error: error.message,
+          };
+          result.error = `Orderbook check failed: ${error.message}`;
+          console.error(`   ❌ Orderbook check failed:`, error.message);
+          return res.status(500).json(result);
+        }
+      }
 
     // Filter for high yes odds (>80%)
     const candidates: Market[] = [];
