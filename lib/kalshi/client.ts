@@ -85,6 +85,21 @@ export function extractYesBidCents(market: any): number | null {
     return Math.round(market.yes_bid);
   }
   
+  // Try yes_ask as fallback if yes_bid is missing (common for open markets)
+  if (typeof market.yes_ask === 'number' && market.yes_ask > 0) {
+    return Math.round(market.yes_ask);
+  }
+  
+  // Try yes_price if available
+  if (typeof market.yes_price === 'number' && market.yes_price > 0) {
+    // Check if it's already in cents (0-100) or dollars (0-1)
+    if (market.yes_price > 1) {
+      return Math.round(market.yes_price); // Already in cents
+    } else {
+      return Math.round(market.yes_price * 100); // Convert from dollars
+    }
+  }
+  
   // Fallback: yes_bid_dollars as string (SDK returns this as fixed-point decimal string)
   if (typeof market.yes_bid_dollars === 'string') {
     const dollarValue = parseFloat(market.yes_bid_dollars);

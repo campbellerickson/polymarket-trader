@@ -193,11 +193,30 @@ export async function refreshMarketPage(cursor?: string): Promise<{
     const nextCursor = response.data.cursor || null;
 
     // Convert to Market format using the same logic as fetchAllMarkets
-    const marketObjects: Market[] = rawMarkets.map((market: any) => {
+    const marketObjects: Market[] = rawMarkets.map((market: any, index: number) => {
+      // Debug: Log first market structure to understand SDK format
+      if (index === 0) {
+        console.log('   🔍 Sample market from SDK:', JSON.stringify({
+          ticker: market.ticker,
+          yes_bid: market.yes_bid,
+          yes_bid_dollars: market.yes_bid_dollars,
+          yes_ask: market.yes_ask,
+          yes_ask_dollars: market.yes_ask_dollars,
+          last_price: market.last_price,
+          yes_price: market.yes_price,
+          keys: Object.keys(market).filter(k => k.includes('yes') || k.includes('price') || k.includes('bid') || k.includes('ask')),
+        }, null, 2));
+      }
+      
       const yesBidCents = extractYesBidCents(market);
       // SDK Market: yes_bid is in cents (0-100), convert to 0-1 range for yes_odds
       const yesOdds = yesBidCents !== null ? yesBidCents / 100 : 0;
       const noOdds = yesBidCents !== null ? (100 - yesBidCents) / 100 : 0;
+      
+      // Debug: Log if odds are 0
+      if (index === 0 && yesOdds === 0) {
+        console.warn('   ⚠️ First market has 0 odds - check extractYesBidCents function');
+      }
 
       // SDK Market: uses expected_expiration_time, expiration_time, or close_time
       let endDate: Date;
