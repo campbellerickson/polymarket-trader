@@ -11,7 +11,7 @@ const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 export async function analyzeContracts(
   request: AnalysisRequest
 ): Promise<AnalysisResponse> {
-  console.log(`🤖 Analyzing ${request.contracts.length} contracts with AI (GPT-4 Turbo)...`);
+  console.log(`🤖 Analyzing ${request.contracts.length} contracts with AI (GPT-4o)...`);
 
   if (request.contracts.length === 0) {
     return {
@@ -35,7 +35,7 @@ export async function analyzeContracts(
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      model: 'gpt-4-turbo-preview', // Use GPT-4 Turbo for best reasoning
+      model: 'gpt-4o', // Use GPT-4o for best reasoning and speed
       max_tokens: 4000,
       temperature: 0.7, // Balanced creativity
       messages: [
