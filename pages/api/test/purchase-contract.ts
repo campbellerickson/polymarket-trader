@@ -22,8 +22,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   const TEST_AMOUNT = 5; // $5 purchase
-  const MIN_YES_ODDS = 0.70; // 70% minimum (lowered for testing)
-  const MIN_LIQUIDITY = 50; // Minimum contracts available (lowered for testing)
+  const MIN_YES_ODDS = 0.60; // 60% minimum (lowered for testing)
+  const MIN_LIQUIDITY = 20; // Minimum contracts available (lowered for testing)
 
   const result: any = {
     timestamp: new Date().toISOString(),
