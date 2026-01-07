@@ -94,9 +94,15 @@ CURRENT SITUATION:
 AVAILABLE CONTRACTS:
 ${contractsList}
 
-Analyze these contracts and select 1-3 contracts to allocate up to $${request.dailyBudget} across.
+Analyze these contracts and select 0-3 contracts based on quality.
 
-CRITICAL: You MUST select at least 1 contract per day. Choose the best opportunity even if it's not perfect.
+STRATEGY: HYPER-CONSERVATIVE
+- Be extremely selective - quality over quantity
+- Only select contracts with LOW VARIANCE and stable, predictable outcomes
+- Reject volatile markets (sports, crypto price thresholds, weather)
+- Favor process-driven, calendar-driven, or administrative outcomes
+- You CAN select 0 contracts if nothing meets high standards
+- You CAN select up to 3 if multiple excellent opportunities exist
 
 IMPORTANT: For EVERY contract (both selected AND rejected), provide reasoning.
 
@@ -106,8 +112,8 @@ Return JSON in this format:
     {
       "market_id": "...",
       "allocation": 30,
-      "confidence": 0.75,
-      "reasoning": "Why you're trading this",
+      "confidence": 0.95,
+      "reasoning": "Why this meets the ultra-high quality bar",
       "risk_factors": ["risk1", "risk2"]
     }
   ],
@@ -117,18 +123,18 @@ Return JSON in this format:
       "reasoning": "Why you're NOT trading this (be specific)"
     }
   ],
-  "strategy_notes": "Overall strategy for today"
+  "strategy_notes": "Overall assessment of today's opportunities"
 }
 
 Guidelines:
-- MUST select 1-3 contracts (minimum 1, maximum 3)
-- Choose the BEST opportunity available even if odds aren't perfect
+- Select 0-3 contracts (only trade when quality is exceptional)
 - Total allocation must be <= $${request.dailyBudget}
 - Minimum $20 per contract, maximum $50 per contract
-- Diversify across uncorrelated events when selecting multiple
+- Prioritize LOW VARIANCE over high odds
+- Reject volatile/unpredictable outcomes
+- Favor stable, process-driven markets
 - Consider historical patterns from above
-- Higher conviction contracts get larger allocations
-- BE SPECIFIC about rejection reasons (edge too small, uncertainty, risk factors, etc.)
+- BE SPECIFIC about rejection reasons
 `.trim();
 }
 
@@ -162,10 +168,8 @@ function parseAIResponse(text: string, contracts: Contract[], dailyBudget: numbe
       };
     });
 
-    // Enforce 1-3 selections (MUST select at least 1)
-    if (selectedContracts.length === 0) {
-      throw new Error('AI must select at least 1 contract per day. AI returned 0 selections.');
-    }
+    // Allow 0-3 selections (hyper-conservative approach)
+    // Note: Separate logic will enforce "1 trade minimum every 2 days"
     if (selectedContracts.length > 3) {
       selectedContracts = selectedContracts.slice(0, 3);
     }
