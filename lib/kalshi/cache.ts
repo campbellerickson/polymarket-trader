@@ -117,12 +117,12 @@ export async function getCachedMarkets(): Promise<Market[]> {
       end_date: new Date(row.end_date),
       yes_odds: yesOdds,
       no_odds: noOdds,
-    liquidity: parseFloat(row.liquidity?.toString() || '0'),
-    volume_24h: parseFloat(row.volume_24h?.toString() || '0'),
+    liquidity: row.liquidity !== undefined && row.liquidity !== null ? parseFloat(String(row.liquidity)) : 0,
+    volume_24h: row.volume_24h !== undefined && row.volume_24h !== null ? parseFloat(String(row.volume_24h)) : 0,
     resolved: row.resolved || false,
     category: row.category || undefined,
     outcome: row.outcome || undefined,
-    final_odds: row.final_odds ? parseFloat(row.final_odds.toString()) : undefined,
+    final_odds: row.final_odds !== undefined && row.final_odds !== null ? parseFloat(String(row.final_odds)) : undefined,
     resolved_at: row.resolved_at ? new Date(row.resolved_at) : undefined,
     };
   });
