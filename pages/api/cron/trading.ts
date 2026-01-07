@@ -62,14 +62,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     console.log(`🤖 AI selected ${analysis.selectedContracts.length} contracts`);
     console.log(`💰 Total allocation: $${analysis.totalAllocated}`);
 
-    // 3.5. Enforce "minimum 1 trade every 2 days" rule
+    // 3.5. Enforce "minimum 1 SUCCESSFUL trade every 2 days" rule
     if (analysis.selectedContracts.length === 0) {
       const twoDaysAgo = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000);
       const { getTradesInRange } = await import('../../../lib/database/queries');
       const recentTrades = await getTradesInRange(twoDaysAgo, new Date());
 
-      if (recentTrades.length === 0) {
-        console.log('⚠️ AI selected 0 contracts, but no trades in 2 days. Forcing 1 trade...');
+      // Only count SUCCESSFUL trades (exclude cancelled orders)
+      const successfulTrades = recentTrades.filter(t => t.status !== 'cancelled');
+
+      if (successfulTrades.length === 0) {
+        console.log(`⚠️ AI selected 0 contracts, but no SUCCESSFUL trades in 2 days (${recentTrades.length - successfulTrades.length} were cancelled). Forcing 1 trade...`);
 
         // Force AI to pick the best contract
         const bestContract = contracts[0]; // Contracts are already sorted by quality
@@ -77,13 +80,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           contract: bestContract,
           allocation: TRADING_CONSTANTS.DAILY_BUDGET,
           confidence: 0.75,
-          reasoning: 'FORCED: Minimum 1 trade every 2 days requirement',
-          riskFactors: ['Forced trade due to 2-day rule'],
+          reasoning: 'FORCED: Minimum 1 successful trade every 2 days requirement',
+          riskFactors: ['Forced trade due to 2-day rule - previous orders were cancelled'],
         }];
         analysis.totalAllocated = TRADING_CONSTANTS.DAILY_BUDGET;
         console.log(`   Forced selection: ${bestContract.question}`);
       } else {
-        console.log(`✅ AI selected 0 contracts, but we traded ${recentTrades.length}x in last 2 days. Skipping.`);
+        console.log(`✅ AI selected 0 contracts, but we had ${successfulTrades.length} successful trades in last 2 days. Skipping.`);
       }
     }
 
