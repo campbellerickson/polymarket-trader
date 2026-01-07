@@ -1,6 +1,7 @@
 import { supabase } from '../database/client';
 import { Market } from '../../types';
-import { KALSHI_API_BASE, createAuthHeaders, extractYesBidCents } from './client';
+import { extractYesBidCents, getMarketApi } from './client';
+import { MarketApi } from 'kalshi-typescript';
 
 /**
  * Cache market data in database to avoid excessive API calls
@@ -105,27 +106,29 @@ export async function refreshMarketPage(cursor?: string): Promise<{
 }> {
   console.log('🔄 Refreshing market page...', cursor ? `(cursor: ${cursor.substring(0, 20)}...)` : '(first page)');
 
-  const path = cursor ? `/markets?status=open&cursor=${cursor}` : '/markets?status=open';
+  const marketApi = getMarketApi();
 
   try {
-    const response = await fetch(`${KALSHI_API_BASE}${path}`, {
-      method: 'GET',
-      headers: createAuthHeaders('GET', path),
-    });
+    // Use SDK's getMarkets method (positional parameters)
+    const response = await marketApi.getMarkets(
+      100, // limit
+      cursor || undefined, // cursor
+      undefined, // eventTicker
+      undefined, // seriesTicker
+      undefined, // minCreatedTs
+      undefined, // maxCreatedTs
+      undefined, // maxCloseTs
+      undefined, // minCloseTs
+      undefined, // minSettledTs
+      undefined, // maxSettledTs
+      'open', // status
+      undefined, // tickers
+      undefined, // mveFilter
+    );
 
-    if (!response.ok) {
-      if (response.status === 429) {
-        const retryAfter = response.headers.get('Retry-After');
-        const waitTime = retryAfter ? parseInt(retryAfter) * 1000 : 5000;
-        throw new Error(`RATE_LIMITED:${waitTime}`);
-      }
-      const errorText = await response.text();
-      throw new Error(`Kalshi API error: ${response.status} ${response.statusText} - ${errorText}`);
-    }
-
-    const data = await response.json();
-    const rawMarkets = data.markets || [];
-    const nextCursor = data.cursor || null;
+    // SDK returns data in response.data
+    const rawMarkets = response.data.markets || [];
+    const nextCursor = response.data.cursor || null;
 
     // Convert to Market format using the same logic as fetchAllMarkets
     const marketObjects: Market[] = rawMarkets.map((market: any) => {
@@ -170,10 +173,21 @@ export async function refreshMarketPage(cursor?: string): Promise<{
       isComplete: !nextCursor || rawMarkets.length === 0,
     };
   } catch (error: any) {
-    if (error.message.startsWith('RATE_LIMITED:')) {
+    // Handle rate limiting gracefully
+    if (error.response?.status === 429) {
+      const retryAfter = error.response.headers['retry-after'];
+      const waitTime = retryAfter ? parseInt(retryAfter) * 1000 : 5000;
+      throw new Error(`Rate limited. Wait ${waitTime}ms`);
+    }
+    
+    // If error message contains rate limit info
+    if (error.message?.startsWith('RATE_LIMITED:')) {
       const waitTime = parseInt(error.message.split(':')[1]);
       throw new Error(`Rate limited. Wait ${waitTime}ms`);
     }
-    throw error;
+    
+    const errorMessage = error.response?.data?.error?.message || error.message || 'Unknown error';
+    const statusCode = error.response?.status || 500;
+    throw new Error(`Kalshi API error: ${statusCode} - ${errorMessage}`);
   }
 }

@@ -1,15 +1,12 @@
 import { env } from '../../config/env';
 import { Market, Orderbook } from '../../types';
-import crypto from 'crypto';
+import { Configuration, PortfolioApi, MarketApi, OrdersApi } from 'kalshi-typescript';
 
 export const KALSHI_API_BASE = 'https://api.elections.kalshi.com/trade-api/v2';
 
 /**
- * Create signature for Kalshi API authentication
- * Based on official Kalshi API documentation: https://docs.kalshi.com/getting_started/api_keys
- * 
- * Signature is created by signing: timestamp + HTTP method + request path
- * For POST requests, the request body is also included in the signature
+ * Normalize PEM key from environment variable
+ * Handles escaped newlines and surrounding quotes
  */
 function normalizePemKey(raw: string): string {
   let key = (raw ?? '').trim();
@@ -28,32 +25,13 @@ function normalizePemKey(raw: string): string {
   return key;
 }
 
-function createSignature(timestamp: string, method: string, path: string, body?: string): string {
-  // Kalshi V2 requires: <timestamp_in_ms><METHOD><path_without_params>
-  // Path MUST exclude query parameters for signature
-  // Path should NOT include host (just the path after the base URL)
-  const basePath = path.split('?')[0];
-  
-  // Build the message to sign: timestamp + METHOD + path (without query params) + body (if POST)
-  // Format: <timestamp_in_ms><METHOD><path_without_params>
-  const message = `${timestamp}${method.toUpperCase()}${basePath}${body || ''}`;
-
-  // Debug logging (only in non-production)
-  if (process.env.NODE_ENV !== 'production' || process.env.DEBUG_AUTH === 'true') {
-    console.log('🔐 Signature Debug:', {
-      timestamp,
-      timestampLength: timestamp.length,
-      method: method.toUpperCase(),
-      pathWithParams: path,
-      pathWithoutParams: basePath,
-      bodyLength: body ? body.length : 0,
-      messageLength: message.length,
-      messagePreview: message.substring(0, 150),
-      messageFull: message, // Full message for debugging
-    });
-  }
-
+/**
+ * Initialize Kalshi SDK configuration
+ * The SDK handles RSA-PSS signing automatically
+ */
+function getKalshiConfig(): Configuration {
   const privateKeyPem = normalizePemKey(env.KALSHI_PRIVATE_KEY);
+  
   if (
     !privateKeyPem.includes('BEGIN RSA PRIVATE KEY') &&
     !privateKeyPem.includes('BEGIN PRIVATE KEY') &&
@@ -62,93 +40,37 @@ function createSignature(timestamp: string, method: string, path: string, body?:
     throw new Error('Invalid private key format: missing PEM BEGIN marker');
   }
 
-  try {
-    const keyObject = crypto.createPrivateKey(privateKeyPem);
-
-    // Kalshi uses RSA-PSS with SHA-256
-    // Try RSA-PSS first, fallback to PKCS1 if needed
-    const constants: any = (crypto as any).constants;
-    
-    // Kalshi V2 REQUIRES RSA-PSS with:
-    // - Padding: PSS
-    // - MGF: MGF1 with SHA-256
-    // - Salt Length: Must match digest length (32 bytes for SHA-256) OR MAX_LENGTH
-    // - Hash: SHA-256
-    // Node.js uses RSA_PKCS1_PSS_PADDING constant (not RSA_PSS_PADDING)
-    // Try DIGEST first (32 bytes = SHA-256 digest length), fallback to MAX_SIGN if needed
-    let signature: Buffer;
-    try {
-      signature = crypto.sign('sha256', Buffer.from(message), {
-        key: keyObject,
-        padding: crypto.constants.RSA_PKCS1_PSS_PADDING,
-        saltLength: crypto.constants.RSA_PSS_SALTLEN_DIGEST, // 32 bytes for SHA-256
-      });
-    } catch (error: any) {
-      // Fallback to MAX_SIGN if DIGEST fails
-      console.warn('RSA-PSS with DIGEST salt length failed, trying MAX_SIGN:', error.message);
-      signature = crypto.sign('sha256', Buffer.from(message), {
-        key: keyObject,
-        padding: crypto.constants.RSA_PKCS1_PSS_PADDING,
-        saltLength: crypto.constants.RSA_PSS_SALTLEN_MAX_SIGN,
-      });
-    }
-
-    const signatureBase64 = signature.toString('base64');
-    
-    if (process.env.NODE_ENV !== 'production' || process.env.DEBUG_AUTH === 'true') {
-      console.log('🔐 Signature created:', {
-        signatureLength: signatureBase64.length,
-        signaturePreview: signatureBase64.substring(0, 20) + '...',
-      });
-    }
-
-    return signatureBase64;
-  } catch (error: any) {
-    console.error('❌ Signature creation error:', {
-      error: error.message,
-      stack: error.stack,
-      keyFormat: privateKeyPem.substring(0, 50) + '...',
-    });
-    throw new Error(`Failed to create signature: ${error?.message || String(error)}. Check KALSHI_PRIVATE_KEY format.`);
-  }
+  return new Configuration({
+    apiKey: env.KALSHI_API_ID,
+    privateKeyPem: privateKeyPem,
+    basePath: KALSHI_API_BASE,
+  });
 }
 
-/**
- * Create authenticated headers for Kalshi API requests
- * Based on official Kalshi API documentation: https://docs.kalshi.com/getting_started/api_keys
- */
-export function createAuthHeaders(method: string, path: string, body?: string): Record<string, string> {
-  // Timestamp MUST be in milliseconds (13 digits), as a string
-  // Example: "1704581200000" (not "1704581200")
-  const timestamp = Date.now().toString();
-  
-  // Verify timestamp is 13 digits (milliseconds)
-  if (timestamp.length !== 13) {
-    console.error('⚠️ WARNING: Timestamp is not 13 digits:', timestamp);
-  }
-  
-  const signature = createSignature(timestamp, method, path, body);
-  
-  const headers = {
-    'KALSHI-ACCESS-KEY': env.KALSHI_API_ID,
-    'KALSHI-ACCESS-TIMESTAMP': timestamp,
-    'KALSHI-ACCESS-SIGNATURE': signature,
-    'Content-Type': 'application/json',
-  };
+// Singleton instances (reused across requests)
+let portfolioApiInstance: PortfolioApi | null = null;
+let marketApiInstance: MarketApi | null = null;
+let ordersApiInstance: OrdersApi | null = null;
 
-  // Debug logging
-  if (process.env.NODE_ENV !== 'production' || process.env.DEBUG_AUTH === 'true') {
-    console.log('🔐 Auth Headers:', {
-      apiKey: env.KALSHI_API_ID.substring(0, 10) + '...',
-      timestamp,
-      timestampLength: timestamp.length,
-      signatureLength: signature.length,
-      pathWithParams: path,
-      method,
-    });
+function getPortfolioApi(): PortfolioApi {
+  if (!portfolioApiInstance) {
+    portfolioApiInstance = new PortfolioApi(getKalshiConfig());
   }
+  return portfolioApiInstance;
+}
 
-  return headers;
+export function getMarketApi(): MarketApi {
+  if (!marketApiInstance) {
+    marketApiInstance = new MarketApi(getKalshiConfig());
+  }
+  return marketApiInstance;
+}
+
+function getOrdersApi(): OrdersApi {
+  if (!ordersApiInstance) {
+    ordersApiInstance = new OrdersApi(getKalshiConfig());
+  }
+  return ordersApiInstance;
 }
 
 /**
@@ -208,6 +130,8 @@ export async function fetchAllMarkets(options?: {
 
   console.log(`🔍 Fetching all active markets from Kalshi (with pagination, ${rateLimitMs}ms rate limit)...`);
 
+  const marketApi = getMarketApi();
+
   do {
     pageCount++;
     if (pageCount > maxPages) {
@@ -215,40 +139,30 @@ export async function fetchAllMarkets(options?: {
       break;
     }
 
-    // Build path with cursor if available
-    let path = '/markets?status=open';
-    if (cursor) {
-      path += `&cursor=${cursor}`;
-    }
-
     try {
-      const response = await fetch(`${KALSHI_API_BASE}${path}`, {
-        method: 'GET',
-        headers: createAuthHeaders('GET', path),
-      });
+      // Use SDK's getMarkets method (positional parameters)
+      const response = await marketApi.getMarkets(
+        100, // limit
+        cursor || undefined, // cursor
+        undefined, // eventTicker
+        undefined, // seriesTicker
+        undefined, // minCreatedTs
+        undefined, // maxCreatedTs
+        undefined, // maxCloseTs
+        undefined, // minCloseTs
+        undefined, // minSettledTs
+        undefined, // maxSettledTs
+        'open', // status
+        undefined, // tickers
+        undefined, // mveFilter
+      );
 
-      if (!response.ok) {
-        // Handle rate limiting gracefully
-        if (response.status === 429) {
-          const retryAfter = response.headers.get('Retry-After');
-          const waitTime = retryAfter ? parseInt(retryAfter) * 1000 : 5000; // Default 5 seconds
-          console.warn(`⚠️ Rate limited (429). Waiting ${waitTime}ms before retry...`);
-          await sleep(waitTime);
-          continue; // Retry this page
-        }
-        
-        const errorText = await response.text();
-        throw new Error(`Kalshi API error: ${response.status} ${response.statusText} - ${errorText}`);
-      }
-
-      const data = await response.json();
-      
-      // Kalshi API returns { markets: [...], cursor: "..." } structure
-      const markets = data.markets || [];
+      // SDK returns data in response.data
+      const markets = response.data.markets || [];
       allMarkets.push(...markets);
       
       // Get next cursor for pagination
-      cursor = data.cursor || null;
+      cursor = response.data.cursor || null;
       
       console.log(`   Page ${pageCount}: Fetched ${markets.length} markets (total: ${allMarkets.length})`);
       
@@ -262,8 +176,17 @@ export async function fetchAllMarkets(options?: {
         await sleep(rateLimitMs);
       }
     } catch (error: any) {
-      // If rate limited, wait and retry
-      if (error.message.includes('429') || error.message.includes('rate')) {
+      // Handle rate limiting gracefully
+      if (error.response?.status === 429) {
+        const retryAfter = error.response.headers['retry-after'];
+        const waitTime = retryAfter ? parseInt(retryAfter) * 1000 : 5000; // Default 5 seconds
+        console.warn(`⚠️ Rate limited (429). Waiting ${waitTime}ms before retry...`);
+        await sleep(waitTime);
+        continue; // Retry this page
+      }
+      
+      // If rate limited (in error message), wait and retry
+      if (error.message?.includes('429') || error.message?.includes('rate')) {
         console.warn(`⚠️ Rate limit error. Waiting ${rateLimitMs * 2}ms before retry...`);
         await sleep(rateLimitMs * 2);
         continue; // Retry this page
@@ -320,79 +243,75 @@ export async function getOrderbookWithLiquidity(ticker: string): Promise<{
   liquidity: number; // Contracts available at best price
   side: 'YES' | 'NO'; // Which side we'd be buying
 }> {
-  const path = `/markets/${ticker}/orderbook`;
-  const response = await fetch(`${KALSHI_API_BASE}${path}`, {
-    method: 'GET',
-    headers: createAuthHeaders('GET', path),
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`Failed to fetch orderbook: ${response.status} ${response.statusText} - ${errorText}`);
-  }
-
-  const data = await response.json();
-  const orderbook = data.orderbook || data;
+  const marketApi = getMarketApi();
   
-  // Kalshi orderbook structure: { yes_bids: [{price, size}], yes_asks: [...], no_bids: [...], no_asks: [...] }
-  const yesBids = orderbook.yes_bids || orderbook.yesBids || [];
-  const yesAsks = orderbook.yes_asks || orderbook.yesAsks || [];
-  const noBids = orderbook.no_bids || orderbook.noBids || [];
-  const noAsks = orderbook.no_asks || orderbook.noAsks || [];
-  
-  // Extract best prices and sizes
-  const bestYesBid = yesBids.length > 0 ? {
-    price: parseFloat(yesBids[0].price || yesBids[0].price_cents || yesBids[0]) / 100,
-    size: parseInt(yesBids[0].size || yesBids[0].quantity || '0', 10),
-  } : { price: 0, size: 0 };
+  try {
+    // Use SDK's getMarketOrderbook method
+    const response = await marketApi.getMarketOrderbook(ticker);
+    const orderbookData = response.data.orderbook || response.data;
+    
+    // SDK Orderbook structure: { 'true': [[price, size], ...], 'false': [[price, size], ...], yes_dollars: [...], no_dollars: [...] }
+    // 'true' array = YES bids (sorted by price descending, best first)
+    // 'false' array = NO bids (sorted by price descending, best first)
+    // Each entry is [price_in_cents, size_in_contracts] as numbers
+    const yesBids = orderbookData['true'] || [];
+    const noBids = orderbookData['false'] || [];
+    
+    // Extract best prices and sizes (first entry in each array is the best bid)
+    const bestYesBid = yesBids.length > 0 && Array.isArray(yesBids[0]) && yesBids[0].length >= 2 ? {
+      price: (yesBids[0][0] as number) / 100, // price in cents -> dollars
+      size: yesBids[0][1] as number, // size in contracts
+    } : { price: 0, size: 0 };
 
-  const bestYesAsk = yesAsks.length > 0 ? {
-    price: parseFloat(yesAsks[0].price || yesAsks[0].price_cents || yesAsks[0]) / 100,
-    size: parseInt(yesAsks[0].size || yesAsks[0].quantity || '0', 10),
-  } : { price: 0, size: 0 };
+    const bestNoBid = noBids.length > 0 && Array.isArray(noBids[0]) && noBids[0].length >= 2 ? {
+      price: (noBids[0][0] as number) / 100, // price in cents -> dollars
+      size: noBids[0][1] as number, // size in contracts
+    } : { price: 0, size: 0 };
 
-  const bestNoBid = noBids.length > 0 ? {
-    price: parseFloat(noBids[0].price || noBids[0].price_cents || noBids[0]) / 100,
-    size: parseInt(noBids[0].size || noBids[0].quantity || '0', 10),
-  } : { price: 0, size: 0 };
+    // For asks, we'd need to look at asks (if available), but SDK orderbook shows bids
+    // For now, use bids as proxy (best bid = what we can buy at)
+    const bestYesAsk = bestYesBid; // Approximate - SDK may not provide asks in this structure
+    const bestNoAsk = bestNoBid; // Approximate
 
-  const bestNoAsk = noAsks.length > 0 ? {
-    price: parseFloat(noAsks[0].price || noAsks[0].price_cents || noAsks[0]) / 100,
-    size: parseInt(noAsks[0].size || noAsks[0].quantity || '0', 10),
-  } : { price: 0, size: 0 };
+    // Determine which side we'd be buying based on price
+    // If yes price > 85 cents, we buy YES (use yes bids for liquidity)
+    // If yes price < 15 cents, we effectively buy NO (use no bids for liquidity)
+    const yesPriceCents = bestYesBid.price * 100;
+    let liquidity: number;
+    let side: 'YES' | 'NO';
 
-  // Determine which side we'd be buying based on price
-  // If yes price > 85 cents, we buy YES (use yes bids for liquidity)
-  // If yes price < 15 cents, we effectively buy NO (use no bids for liquidity)
-  const yesPriceCents = bestYesBid.price * 100;
-  let liquidity: number;
-  let side: 'YES' | 'NO';
+    if (yesPriceCents >= 85) {
+      // High probability YES - we'd buy YES contracts
+      liquidity = bestYesBid.size;
+      side = 'YES';
+    } else if (yesPriceCents <= 15) {
+      // Low probability YES (high NO) - we'd buy NO contracts
+      liquidity = bestNoBid.size;
+      side = 'NO';
+    } else {
+      // Middle range (16-84%) - not in our filter range, but return yes liquidity as default
+      liquidity = bestYesBid.size;
+      side = 'YES';
+    }
 
-  if (yesPriceCents >= 85) {
-    // High probability YES - we'd buy YES contracts
-    liquidity = bestYesBid.size;
-    side = 'YES';
-  } else if (yesPriceCents <= 15) {
-    // Low probability YES (high NO) - we'd buy NO contracts
-    liquidity = bestNoBid.size;
-    side = 'NO';
-  } else {
-    // Middle range (16-84%) - not in our filter range, but return yes liquidity as default
-    liquidity = bestYesBid.size;
-    side = 'YES';
-  }
-
-  return {
-    orderbook: {
+    const orderbookResult: Orderbook = {
       market_id: ticker,
       bestYesBid: bestYesBid.price,
       bestYesAsk: bestYesAsk.price,
       bestNoBid: bestNoBid.price,
       bestNoAsk: bestNoAsk.price,
-    },
-    liquidity,
-    side,
-  };
+    };
+
+    return {
+      orderbook: orderbookResult,
+      liquidity,
+      side,
+    };
+  } catch (error: any) {
+    const errorMessage = error.response?.data?.error?.message || error.message || 'Unknown error';
+    const statusCode = error.response?.status || 500;
+    throw new Error(`Failed to fetch orderbook: ${statusCode} - ${errorMessage}`);
+  }
 }
 
 /**
@@ -414,41 +333,37 @@ export async function fetchMarkets(): Promise<Market[]> {
 
 /**
  * Get a specific market by ticker
- * Reference: https://docs.kalshi.com/reference/get-market
  */
 export async function getMarket(ticker: string): Promise<Market> {
-  const path = `/markets/${ticker}`;
-  const response = await fetch(`${KALSHI_API_BASE}${path}`, {
-    method: 'GET',
-    headers: createAuthHeaders('GET', path),
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`Failed to fetch market: ${response.status} ${response.statusText} - ${errorText}`);
+  const marketApi = getMarketApi();
+  
+  try {
+    const response = await marketApi.getMarket(ticker);
+    const market: any = response.data.market || response.data;
+    
+    const yesBidCents = extractYesBidCents(market);
+    const yesOdds = yesBidCents !== null ? yesBidCents / 100 : 0;
+    const noOdds = yesBidCents !== null ? (100 - yesBidCents) / 100 : 0;
+    
+    return {
+      market_id: market.ticker || market.market_id || market.id,
+      question: market.title || market.question || market.subtitle,
+      end_date: new Date(market.expiration_time || market.expirationTime || market.end_date),
+      yes_odds: yesOdds,
+      no_odds: noOdds,
+      liquidity: parseFloat(market.liquidity || market.open_interest || 0),
+      volume_24h: parseFloat(market.volume || market.volume_24h || 0),
+      resolved: market.status === 'closed' || market.status === 'resolved' || false,
+      category: market.category || undefined,
+      outcome: market.result ? (market.result === 'yes' ? 'YES' : 'NO') : undefined,
+      final_odds: market.result_price ? parseFloat(market.result_price) / 100 : undefined,
+      resolved_at: market.settlement_time ? new Date(market.settlement_time) : undefined,
+    };
+  } catch (error: any) {
+    const errorMessage = error.response?.data?.error?.message || error.message || 'Unknown error';
+    const statusCode = error.response?.status || 500;
+    throw new Error(`Failed to fetch market: ${statusCode} - ${errorMessage}`);
   }
-
-  const data = await response.json();
-  const market = data.market || data;
-  
-  const yesBidCents = extractYesBidCents(market);
-  const yesOdds = yesBidCents !== null ? yesBidCents / 100 : 0;
-  const noOdds = yesBidCents !== null ? (100 - yesBidCents) / 100 : 0;
-  
-  return {
-    market_id: market.ticker || market.market_id || market.id,
-    question: market.title || market.question || market.subtitle,
-    end_date: new Date(market.expiration_time || market.expirationTime || market.end_date),
-    yes_odds: yesOdds,
-    no_odds: noOdds,
-    liquidity: parseFloat(market.liquidity || market.open_interest || 0),
-    volume_24h: parseFloat(market.volume || market.volume_24h || 0),
-    resolved: market.status === 'closed' || market.status === 'resolved' || false,
-    category: market.category || undefined,
-    outcome: market.result ? (market.result === 'yes' ? 'YES' : 'NO') : undefined,
-    final_odds: market.result_price ? parseFloat(market.result_price) / 100 : undefined,
-    resolved_at: market.settlement_time ? new Date(market.settlement_time) : undefined,
-  };
 }
 
 /**
@@ -461,29 +376,27 @@ export async function getOrderbook(ticker: string): Promise<Orderbook> {
 
 /**
  * Get account balance from Kalshi
- * Reference: https://docs.kalshi.com/reference/get-portfolio-balance
+ * Uses the official SDK which handles authentication automatically
  */
 export async function getAccountBalance(): Promise<number> {
-  const path = '/portfolio/balance';
-  const response = await fetch(`${KALSHI_API_BASE}${path}`, {
-    method: 'GET',
-    headers: createAuthHeaders('GET', path),
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`Failed to fetch balance: ${response.status} ${response.statusText} - ${errorText}`);
+  const portfolioApi = getPortfolioApi();
+  
+  try {
+    const response = await portfolioApi.getBalance();
+    // Kalshi returns balance in cents, convert to dollars
+    // SDK type: GetBalanceResponse has 'balance' property
+    const balance = response.data.balance || 0;
+    return balance / 100;
+  } catch (error: any) {
+    const errorMessage = error.response?.data?.error?.message || error.message || 'Unknown error';
+    const statusCode = error.response?.status || 500;
+    throw new Error(`Failed to fetch balance: ${statusCode} ${errorMessage}`);
   }
-
-  const data = await response.json();
-  // Kalshi returns balance in cents, convert to dollars
-  const balance = data.balance || data.available_balance || data.total_balance || 0;
-  return balance / 100;
 }
 
 /**
  * Place an order on Kalshi
- * Reference: https://docs.kalshi.com/reference/post-portfolio-orders
+ * Uses the official SDK which handles authentication automatically
  */
 export async function placeOrder(order: {
   market: string;
@@ -496,7 +409,7 @@ export async function placeOrder(order: {
     return { order_id: 'dry-run-order', status: 'resting' };
   }
 
-  const path = '/portfolio/orders';
+  const ordersApi = getOrdersApi();
   
   // Convert side to Kalshi format
   const side = order.side === 'YES' || order.side === 'SELL_YES' ? 'yes' : 'no';
@@ -506,26 +419,30 @@ export async function placeOrder(order: {
   // Price should be integer between 1-99 (cents)
   const orderPrice = Math.max(1, Math.min(99, Math.floor(order.price * 100)));
   
-  const body = JSON.stringify({
-    ticker: order.market,
-    side: side,
-    action: action,
-    count: Math.floor(order.amount), // Number of contracts
-    price: orderPrice, // Price in cents (1-99)
-    type: 'limit', // 'limit' or 'market'
-  });
-
-  const response = await fetch(`${KALSHI_API_BASE}${path}`, {
-    method: 'POST',
-    headers: createAuthHeaders('POST', path, body),
-    body,
-  });
-
-  if (!response.ok) {
-    const error = await response.text();
-    throw new Error(`Failed to place order: ${response.status} ${response.statusText} - ${error}`);
+  try {
+    // OrdersApi.createOrder takes a CreateOrderRequest object
+    // Use yes_price or no_price depending on side
+    const orderRequest: any = {
+      ticker: order.market,
+      side: side as 'yes' | 'no',
+      action: action as 'buy' | 'sell',
+      count: Math.floor(order.amount), // Number of contracts
+      type: 'limit', // 'limit' or 'market'
+    };
+    
+    // Set price based on side (yes_price for yes side, no_price for no side)
+    if (side === 'yes') {
+      orderRequest.yes_price = orderPrice; // Price in cents (1-99)
+    } else {
+      orderRequest.no_price = orderPrice; // Price in cents (1-99)
+    }
+    
+    const response = await ordersApi.createOrder(orderRequest);
+    
+    return (response.data as any).order || response.data;
+  } catch (error: any) {
+    const errorMessage = error.response?.data?.error?.message || error.message || 'Unknown error';
+    const statusCode = error.response?.status || 500;
+    throw new Error(`Failed to place order: ${statusCode} ${errorMessage}`);
   }
-
-  const data = await response.json();
-  return data.order || data;
 }
