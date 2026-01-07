@@ -11,7 +11,7 @@ const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 export async function analyzeContracts(
   request: AnalysisRequest
 ): Promise<AnalysisResponse> {
-  console.log(`🤖 Analyzing ${request.contracts.length} contracts with AI (o1 - most advanced reasoning)...`);
+  console.log(`🤖 Analyzing ${request.contracts.length} contracts with AI (GPT-5.2 - superior reasoning & context)...`);
 
   if (request.contracts.length === 0) {
     return {
@@ -35,10 +35,12 @@ export async function analyzeContracts(
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      model: 'o1', // Use o1 - most advanced reasoning model available
-      max_completion_tokens: 4000, // o1 uses max_completion_tokens instead of max_tokens
+      model: 'gpt-5.2', // GPT-5.2 - most advanced model with superior reasoning and context
+      max_tokens: 8000, // GPT-5.2 supports larger context
+      temperature: 0.7, // Balanced creativity
       messages: [
-        { role: 'user', content: `${TRADING_SYSTEM_PROMPT}\n\n${prompt}` }, // o1 requires system prompt in user message
+        { role: 'system', content: TRADING_SYSTEM_PROMPT },
+        { role: 'user', content: prompt },
       ],
     })
   });
