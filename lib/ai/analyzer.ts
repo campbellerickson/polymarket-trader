@@ -36,7 +36,7 @@ export async function analyzeContracts(
     },
     body: JSON.stringify({
       model: 'gpt-5.2', // GPT-5.2 - most advanced model with superior reasoning and context
-      max_tokens: 8000, // GPT-5.2 supports larger context
+      max_completion_tokens: 8000, // GPT-5.2 uses max_completion_tokens
       temperature: 0.7, // Balanced creativity
       messages: [
         { role: 'system', content: TRADING_SYSTEM_PROMPT },
