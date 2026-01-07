@@ -264,71 +264,74 @@ export async function refreshMarketPage(cursor?: string): Promise<{
     const rawMarkets = response.data.markets || [];
     const nextCursor = response.data.cursor || null;
 
-    // Convert to Market format using robust pricing logic
+    // Convert to Market format using two-step approach:
+    // Step 1: Get all open market tickers (already filtered by status='open' in API call)
+    // Step 2: Fetch orderbook for each to get real bid/ask pricing
     const rawCount = rawMarkets.length;
-    console.log(`   📊 Processing ${rawCount} markets from API...`);
+    console.log(`   📊 Processing ${rawCount} open markets from API...`);
     
-    const marketObjects = rawMarkets
-      .filter((market: any) => {
-        // Strict filter for open markets only
-        const isOpen = market.status === 'open' || market.status === 'Open' || market.status === 'OPEN';
-        if (!isOpen && rawMarkets.indexOf(market) < 3) {
-          console.log(`   ⚠️ Market ${rawMarkets.indexOf(market) + 1} filtered by status: ${market.status}`);
-        }
-        return isOpen;
-      })
-      .map((market: any, index: number): Market | null => {
-        
-        // 1. ROBUST PRICE EXTRACTION
-        // Check all possible field names due to SDK inconsistencies
-        let bid = market.yes_bid ?? market.yesBid ?? 0;
-        let ask = market.yes_ask ?? market.yesAsk ?? 0;
-        let last = market.last_price ?? market.lastPrice ?? 0;
-
-        // 2. DETERMINE TRUE MARKET PRICE (YES ODDS)
-        let yesCents = 0;
-
-        if (bid > 0) {
-          // Standard Case: We have a bid (e.g., 85 cents)
-          yesCents = bid;
-        } else if (ask > 0 && ask <= 5) {
-          // Deep No Case: Bid is 0, but Ask is very low (e.g. 3 cents).
-          // This confirms the market is active but priced near 0.
-          yesCents = 0;
-        } else if (last > 0) {
-          // Fallback: Empty order book, use last traded price
-          yesCents = last;
-        }
-
-        const yesOdds = yesCents / 100;
-
-        // 3. CALCULATE NO ODDS
+    // Filter to only open markets (double-check, though API already filters)
+    const openMarkets = rawMarkets.filter((market: any) => {
+      const isOpen = market.status === 'open' || market.status === 'Open' || market.status === 'OPEN';
+      return isOpen;
+    });
+    
+    console.log(`   📊 Found ${openMarkets.length} open markets to process...`);
+    
+    // Process markets and enrich with orderbook data
+    const marketObjects: Market[] = [];
+    
+    for (let index = 0; index < openMarkets.length; index++) {
+      const market = openMarkets[index];
+      
+      try {
+        // STEP 2: Fetch orderbook to get real bid/ask pricing
+        // Open markets should have orderbook data
+        let yesOdds = 0;
         let noOdds = 0;
-        if (yesOdds === 0) {
-            // FIX: If Yes is 0% (longshot), No is 100% (favorite).
-            // Previously this was set to 0, causing the market to be deleted.
-            noOdds = 1.0; 
-        } else {
-            noOdds = 1 - yesOdds;
-        }
-
-        // 4. CHECK FOR MISSING PRICING - fetch orderbook if needed
-        // If snapshot has no pricing, try to get it from orderbook
-        if (bid === 0 && ask === 0 && last === 0) {
-          // Try to get pricing from orderbook (but only for first few to avoid rate limits)
-          // For now, skip markets with no pricing - we'll enrich them later in scanner
-          if (index < 5) {
-            console.log(`   ⚠️ Market ${index + 1} has no snapshot pricing: ${market.ticker} (will skip for now)`);
-          }
-          return null;
-        }
+        let liquidity = 0;
         
-        // Debug: Log first few markets with pricing
-        if (index < 3) {
-          console.log(`   ✅ Market ${index + 1} has pricing: ${market.ticker} (bid=${bid}, ask=${ask}, last=${last}, yes=${(yesOdds*100).toFixed(1)}%, no=${(noOdds*100).toFixed(1)}%)`);
+        try {
+          const { orderbook: orderbookData, liquidity: orderbookLiquidity } = await getOrderbookWithLiquidity(market.ticker || market.market_id || market.id);
+          
+          // Get best bids from orderbook (in cents: 0-100)
+          const yesBidCents = orderbookData.bestYesBid * 100;
+          const noBidCents = orderbookData.bestNoBid * 100;
+          
+          // Use whichever side has pricing
+          if (yesBidCents > 0) {
+            yesOdds = yesBidCents / 100;
+            noOdds = 1 - yesOdds;
+          } else if (noBidCents > 0) {
+            noOdds = noBidCents / 100;
+            yesOdds = 1 - noOdds;
+          } else {
+            // No bids on either side - skip this market
+            if (index < 5) {
+              console.log(`   ⚠️ Market ${index + 1} has no orderbook bids: ${market.ticker}`);
+            }
+            continue; // Skip to next market
+          }
+          
+          liquidity = orderbookLiquidity;
+          
+          if (index < 3) {
+            console.log(`   ✅ Market ${index + 1}: ${market.ticker} - yes=${(yesOdds*100).toFixed(1)}%, no=${(noOdds*100).toFixed(1)}%, liquidity=${liquidity}`);
+          }
+          
+          // Rate limit: wait 200ms between orderbook calls
+          if (index < openMarkets.length - 1) {
+            await new Promise(resolve => setTimeout(resolve, 200));
+          }
+        } catch (error: any) {
+          // If orderbook fetch fails, skip this market
+          if (index < 5) {
+            console.log(`   ⚠️ Failed to fetch orderbook for ${market.ticker}: ${error.message}`);
+          }
+          continue;
         }
 
-        // 5. PARSE DATES & METADATA
+        // 3. PARSE DATES & METADATA
         let endDate: Date;
         try {
           // SDK uses various fields for expiration
@@ -356,56 +359,28 @@ export async function refreshMarketPage(cursor?: string): Promise<{
           return null;
         }
 
-        return {
+        // Add market to our list
+        marketObjects.push({
           market_id: market.ticker || market.market_id || market.id,
           question: question,
           end_date: endDate,
           yes_odds: yesOdds,
           no_odds: noOdds,
-          liquidity: parseFloat(market.liquidity || 0),
+          liquidity: liquidity,
           volume_24h: parseFloat(market.volume_24h || market.volume || 0),
           resolved: resolved,
           category: market.category || market.event_ticker || undefined,
           outcome: outcome,
           final_odds: market.last_price ? market.last_price / 100 : undefined,
           resolved_at: market.close_time ? new Date(market.close_time) : undefined,
-        };
-      })
-      .filter((market): market is Market => market !== null);
-    
-    // Step 2: Enrich markets with missing pricing by fetching orderbooks
-    // Only do this for a small subset to avoid rate limits
-    const marketsToEnrich = marketObjects.filter(m => m.yes_odds === 0 && m.no_odds === 1.0).slice(0, 5); // Max 5 per page
-    
-    if (marketsToEnrich.length > 0) {
-      console.log(`   🔍 Enriching ${marketsToEnrich.length} markets with orderbook data...`);
-      
-      for (const market of marketsToEnrich) {
-        try {
-          const { orderbook } = await getOrderbookWithLiquidity(market.market_id);
-          
-          // Update pricing from orderbook
-          const yesBidCents = orderbook.bestYesBid * 100;
-          const noBidCents = orderbook.bestNoBid * 100;
-          
-          if (yesBidCents > 0 || noBidCents > 0) {
-            // Use the side with better pricing
-            if (yesBidCents > 0) {
-              market.yes_odds = yesBidCents / 100;
-              market.no_odds = (100 - yesBidCents) / 100;
-            } else if (noBidCents > 0) {
-              market.no_odds = noBidCents / 100;
-              market.yes_odds = (100 - noBidCents) / 100;
-            }
-            
-            console.log(`   ✅ Enriched ${market.market_id}: yes=${(market.yes_odds*100).toFixed(1)}%, no=${(market.no_odds*100).toFixed(1)}%`);
-          }
-          
-          // Small delay to avoid rate limits
-          await new Promise(resolve => setTimeout(resolve, 200));
-        } catch (error: any) {
-          console.log(`   ⚠️ Failed to enrich ${market.market_id}: ${error.message}`);
+        });
+        
+      } catch (error: any) {
+        // Log error but continue processing other markets
+        if (index < 5) {
+          console.log(`   ❌ Error processing market ${index + 1}: ${error.message}`);
         }
+        continue;
       }
     }
     
