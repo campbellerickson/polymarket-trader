@@ -15,7 +15,7 @@ export async function executeTrades(
     try {
       console.log(`   Executing: ${decision.contract.question.substring(0, 50)}...`);
       console.log(`   Allocation: $${decision.allocation}, Confidence: ${(decision.confidence * 100).toFixed(1)}%`);
-      console.log(`   Odds: Yes ${(decision.contract.yes_odds * 100).toFixed(1)}% | No ${(decision.contract.no_odds * 100).toFixed(1)}%`);
+      console.log(`   Odds: Yes ${(decision.contract.yes_odds * 100).toFixed(1)}% | No ${((decision.contract.no_odds || (1 - decision.contract.yes_odds)) * 100).toFixed(1)}%`);
 
       // 1. Validate odds
       const entryOdds = decision.contract.yes_odds;
