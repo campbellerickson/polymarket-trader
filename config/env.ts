@@ -23,7 +23,7 @@ const envSchema = z.object({
   // Trading Parameters
   DAILY_BUDGET: z.string().transform(Number).default('100'),
   MIN_ODDS: z.string().transform(Number).default('0.85'),
-  MAX_ODDS: z.string().transform(Number).default('0.98'),
+  MAX_ODDS: z.string().transform(Number).default('0.96'),
   MAX_DAYS_TO_RESOLUTION: z.string().transform(Number).default('2'),
   MIN_LIQUIDITY: z.string().transform(Number).default('2000'),
   

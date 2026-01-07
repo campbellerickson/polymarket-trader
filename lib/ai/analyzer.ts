@@ -94,7 +94,9 @@ CURRENT SITUATION:
 AVAILABLE CONTRACTS:
 ${contractsList}
 
-Analyze these contracts and select 0-3 contracts to allocate up to $${request.dailyBudget} across.
+Analyze these contracts and select 1-3 contracts to allocate up to $${request.dailyBudget} across.
+
+CRITICAL: You MUST select at least 1 contract per day. Choose the best opportunity even if it's not perfect.
 
 IMPORTANT: For EVERY contract (both selected AND rejected), provide reasoning.
 
@@ -119,10 +121,11 @@ Return JSON in this format:
 }
 
 Guidelines:
-- Select 0-3 contracts (it's OK to select 0 if nothing looks good)
+- MUST select 1-3 contracts (minimum 1, maximum 3)
+- Choose the BEST opportunity available even if odds aren't perfect
 - Total allocation must be <= $${request.dailyBudget}
 - Minimum $20 per contract, maximum $50 per contract
-- Diversify across uncorrelated events
+- Diversify across uncorrelated events when selecting multiple
 - Consider historical patterns from above
 - Higher conviction contracts get larger allocations
 - BE SPECIFIC about rejection reasons (edge too small, uncertainty, risk factors, etc.)
@@ -159,7 +162,10 @@ function parseAIResponse(text: string, contracts: Contract[], dailyBudget: numbe
       };
     });
 
-    // Allow 0-3 selections (0 means "no trade today")
+    // Enforce 1-3 selections (MUST select at least 1)
+    if (selectedContracts.length === 0) {
+      throw new Error('AI must select at least 1 contract per day. AI returned 0 selections.');
+    }
     if (selectedContracts.length > 3) {
       selectedContracts = selectedContracts.slice(0, 3);
     }
