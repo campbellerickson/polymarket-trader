@@ -102,17 +102,39 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         const candidates: Market[] = [];
         
         for (const market of marketsToUse) {
+          // Skip if missing required fields
+          if (!market || !market.market_id || !market.question) {
+            continue;
+          }
+          
           // Same filtering logic as below
           if (!market.yes_odds || market.yes_odds === 0 || market.yes_odds === null) {
             continue;
           }
 
-          if (market.yes_odds < MIN_YES_ODDS) {
+          // Must have >60% yes odds OR >60% no odds
+          const yesOdds = market.yes_odds || 0;
+          const noOdds = market.no_odds || (1 - yesOdds);
+          
+          const hasHighYesOdds = yesOdds >= MIN_YES_ODDS;
+          const hasHighNoOdds = noOdds >= MIN_YES_ODDS;
+          
+          if (!hasHighYesOdds && !hasHighNoOdds) {
             continue;
           }
 
-          const daysToResolution = calculateDaysToResolution(market.end_date);
-          if (daysToResolution > 2 || daysToResolution < 0) {
+          // Check end_date exists and is valid
+          if (!market.end_date || !(market.end_date instanceof Date)) {
+            continue;
+          }
+          
+          try {
+            const daysToResolution = calculateDaysToResolution(market.end_date);
+            if (daysToResolution > 2 || daysToResolution < 0) {
+              continue;
+            }
+          } catch (e: any) {
+            console.warn(`   ⚠️ Error calculating days to resolution for ${market.market_id}:`, e.message);
             continue;
           }
 
@@ -212,6 +234,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const now = new Date();
 
     for (const market of allMarkets) {
+      // Skip if missing required fields
+      if (!market || !market.market_id || !market.question) {
+        continue;
+      }
+      
       // Skip invalid/zero odds
       if (!market.yes_odds || market.yes_odds === 0 || market.yes_odds === null) {
         continue;
@@ -228,9 +255,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         continue;
       }
 
-      // Must be resolved within 2 days (same as main scanner)
-      const daysToResolution = calculateDaysToResolution(market.end_date);
-      if (daysToResolution > 2 || daysToResolution < 0) {
+      // Check end_date exists and is valid
+      if (!market.end_date || !(market.end_date instanceof Date)) {
+        continue;
+      }
+      
+      try {
+        // Must be resolved within 2 days (same as main scanner)
+        const daysToResolution = calculateDaysToResolution(market.end_date);
+        if (daysToResolution > 2 || daysToResolution < 0) {
+          continue;
+        }
+      } catch (e: any) {
+        console.warn(`   ⚠️ Error calculating days to resolution for ${market.market_id}:`, e.message);
         continue;
       }
 
