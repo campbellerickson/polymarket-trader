@@ -144,6 +144,7 @@ export class KalshiMarketScreener {
       
       try {
         // Fetch ONLY open markets (status='open' filters out unopened, closed, and settled)
+        // Use mveFilter='exclude' to filter out 142k multivariate combo markets
         const response = await this.marketApi.getMarkets(
           100, // limit
           cursor || undefined,
@@ -157,7 +158,7 @@ export class KalshiMarketScreener {
           undefined, // maxSettledTs
           'open', // status - ONLY fetch currently open markets
           undefined, // tickers
-          undefined, // mveFilter
+          'exclude', // mveFilter - EXCLUDE multivariate markets (reduces from 166k to 24k markets)
         );
         
         const markets = response.data.markets || [];

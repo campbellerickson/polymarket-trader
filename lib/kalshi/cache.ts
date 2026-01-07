@@ -244,6 +244,7 @@ export async function refreshMarketPage(cursor?: string): Promise<{
 
   try {
     // Use SDK's getMarkets method (positional parameters)
+    // Use mveFilter='exclude' to filter out 142k multivariate combo markets (reduces from 166k to 24k)
     const response = await marketApi.getMarkets(
       100, // limit
       cursor || undefined, // cursor
@@ -257,7 +258,7 @@ export async function refreshMarketPage(cursor?: string): Promise<{
       undefined, // maxSettledTs
       'open', // status
       undefined, // tickers
-      undefined, // mveFilter
+      'exclude', // mveFilter - EXCLUDE multivariate markets for cleaner, tradable data
     );
 
     // SDK returns data in response.data
