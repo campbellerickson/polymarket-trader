@@ -247,7 +247,7 @@ async function logAIDecisions(
       if (!rejection.contract) continue; // Skip if contract not found
 
       await saveAIDecision({
-        trade_id: null, // No trade for rejected
+        trade_id: undefined, // No trade for rejected
         contract_snapshot: rejection.contract,
         features_analyzed: {
           yes_odds: rejection.contract.yes_odds,
