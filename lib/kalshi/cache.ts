@@ -1,6 +1,6 @@
 import { supabase } from '../database/client';
 import { Market } from '../../types';
-import { extractYesBidCents, getMarketApi } from './client';
+import { extractYesBidCents, getMarketApi, getOrderbookWithLiquidity } from './client';
 import { MarketApi } from 'kalshi-typescript';
 
 /**
@@ -312,13 +312,15 @@ export async function refreshMarketPage(cursor?: string): Promise<{
             noOdds = 1 - yesOdds;
         }
 
-        // 4. DEAD MARKET FILTER
-        // Only discard if there is absolutely NO data (no bid, no ask, no last price)
+        // 4. CHECK FOR MISSING PRICING - fetch orderbook if needed
+        // If snapshot has no pricing, try to get it from orderbook
         if (bid === 0 && ask === 0 && last === 0) {
-           if (index < 5) {
-             console.log(`   🚫 Dead market ${index + 1}: ${market.ticker} (bid=${bid}, ask=${ask}, last=${last})`);
-           }
-           return null;
+          // Try to get pricing from orderbook (but only for first few to avoid rate limits)
+          // For now, skip markets with no pricing - we'll enrich them later in scanner
+          if (index < 5) {
+            console.log(`   ⚠️ Market ${index + 1} has no snapshot pricing: ${market.ticker} (will skip for now)`);
+          }
+          return null;
         }
         
         // Debug: Log first few markets with pricing
@@ -370,6 +372,42 @@ export async function refreshMarketPage(cursor?: string): Promise<{
         };
       })
       .filter((market): market is Market => market !== null);
+    
+    // Step 2: Enrich markets with missing pricing by fetching orderbooks
+    // Only do this for a small subset to avoid rate limits
+    const marketsToEnrich = marketObjects.filter(m => m.yes_odds === 0 && m.no_odds === 1.0).slice(0, 5); // Max 5 per page
+    
+    if (marketsToEnrich.length > 0) {
+      console.log(`   🔍 Enriching ${marketsToEnrich.length} markets with orderbook data...`);
+      
+      for (const market of marketsToEnrich) {
+        try {
+          const { orderbook } = await getOrderbookWithLiquidity(market.market_id);
+          
+          // Update pricing from orderbook
+          const yesBidCents = orderbook.bestYesBid * 100;
+          const noBidCents = orderbook.bestNoBid * 100;
+          
+          if (yesBidCents > 0 || noBidCents > 0) {
+            // Use the side with better pricing
+            if (yesBidCents > 0) {
+              market.yes_odds = yesBidCents / 100;
+              market.no_odds = (100 - yesBidCents) / 100;
+            } else if (noBidCents > 0) {
+              market.no_odds = noBidCents / 100;
+              market.yes_odds = (100 - noBidCents) / 100;
+            }
+            
+            console.log(`   ✅ Enriched ${market.market_id}: yes=${(market.yes_odds*100).toFixed(1)}%, no=${(market.no_odds*100).toFixed(1)}%`);
+          }
+          
+          // Small delay to avoid rate limits
+          await new Promise(resolve => setTimeout(resolve, 200));
+        } catch (error: any) {
+          console.log(`   ⚠️ Failed to enrich ${market.market_id}: ${error.message}`);
+        }
+      }
+    }
     
     const openCount = rawMarkets.filter((m: any) => m.status === 'open' || m.status === 'Open' || m.status === 'OPEN').length;
     console.log(`   📊 After filtering: ${openCount} open markets, ${marketObjects.length} markets with pricing data`);

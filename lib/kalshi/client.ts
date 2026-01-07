@@ -289,12 +289,13 @@ export async function getOrderbookWithLiquidity(ticker: string): Promise<{
     const response = await marketApi.getMarketOrderbook(ticker);
     const orderbookData = response.data.orderbook || response.data;
     
-    // SDK Orderbook structure: { 'true': [[price, size], ...], 'false': [[price, size], ...], yes_dollars: [...], no_dollars: [...] }
-    // 'true' array = YES bids (sorted by price descending, best first)
-    // 'false' array = NO bids (sorted by price descending, best first)
+    // Kalshi Orderbook structure: { yes: [[price, size], ...], no: [[price, size], ...] }
+    // yes array = YES bids (sorted by price descending, best first)
+    // no array = NO bids (sorted by price descending, best first)
     // Each entry is [price_in_cents, size_in_contracts] as numbers
-    const yesBids = orderbookData['true'] || [];
-    const noBids = orderbookData['false'] || [];
+    // Handle both SDK format ('true'/'false') and API format ('yes'/'no')
+    const yesBids = orderbookData.yes || orderbookData['true'] || [];
+    const noBids = orderbookData.no || orderbookData['false'] || [];
     
     // Extract best prices and sizes (first entry in each array is the best bid)
     const bestYesBid = yesBids.length > 0 && Array.isArray(yesBids[0]) && yesBids[0].length >= 2 ? {
