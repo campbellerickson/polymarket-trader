@@ -22,8 +22,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   const TEST_AMOUNT = 5; // $5 purchase
-  const MIN_YES_ODDS = 0.80; // 80% minimum
-  const MIN_LIQUIDITY = 100; // Minimum contracts available
+  const MIN_YES_ODDS = 0.70; // 70% minimum (lowered for testing)
+  const MIN_LIQUIDITY = 50; // Minimum contracts available (lowered for testing)
 
   const result: any = {
     timestamp: new Date().toISOString(),
@@ -82,8 +82,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         const directMarkets = await fetchAllMarkets();
         console.log(`   ✅ Fetched ${directMarkets.length} markets directly from API`);
         
-        // Use first 50 for testing to avoid rate limits
-        const marketsToUse = directMarkets.slice(0, 50);
+        // Use first 200 for testing to find qualifying contracts
+        const marketsToUse = directMarkets.slice(0, 200);
         
         if (marketsToUse.length === 0) {
           result.error = 'No markets available (cached or direct fetch).';
