@@ -342,7 +342,7 @@ export class KalshiMarketScreener {
     }
     
     console.log(`   ✅ Phase 2 Complete: ${filtered.length} markets passed basic filters`);
-    console.log(`   📊 Filtering stats:`, {
+    const filteringStats = {
       totalProcessed: stats.totalProcessed,
       skippedNotOpen: stats.skippedNotOpen,
       skippedNoPricing: stats.skippedNoPricing,
@@ -355,7 +355,10 @@ export class KalshiMarketScreener {
       skippedInvalidDate: stats.skippedInvalidDate,
       skippedDaysToResolution: stats.skippedDaysToResolution,
       passed: filtered.length,
-    });
+    };
+    console.log(`   📊 Filtering stats:`, filteringStats);
+    // Store stats for later retrieval
+    this.filteringStats = filteringStats;
     return filtered;
   }
 
@@ -441,6 +444,18 @@ export class KalshiMarketScreener {
     console.log(`   ✅ Phase 4 Complete: ${validated.length}/${topCandidates.length} markets passed depth check`);
     
     return validated;
+  }
+
+  /**
+   * Filtering statistics
+   */
+  private filteringStats: any = null;
+
+  /**
+   * Get last filtering statistics
+   */
+  getFilteringStats(): any {
+    return this.filteringStats;
   }
 
   /**

@@ -53,6 +53,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const screener = new KalshiMarketScreener();
     const screenedMarkets = await screener.screenMarkets(criteria);
     
+    // Get filtering statistics
+    const filteringStats = screener.getFilteringStats();
+    
     // Cache the screened markets for the daily scan to use
     if (screenedMarkets.length > 0) {
       console.log(`💾 Caching ${screenedMarkets.length} screened markets for daily scan...`);
@@ -72,6 +75,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       marketsScreened: screenedMarkets.length,
       marketsCached: screenedMarkets.length,
       message: `Screened and cached ${screenedMarkets.length} tradeable markets for daily scan`,
+      filteringStats: filteringStats, // Include filtering statistics
       summary: {
         totalMarkets: screenedMarkets.length,
         topMarkets: screenedMarkets.slice(0, 10).map(m => ({
