@@ -270,7 +270,7 @@ export async function refreshMarketPage(cursor?: string): Promise<{
     console.log(`   📊 Processing ${rawCount} open markets from API...`);
     
     // Filter to only open markets (double-check, though API already filters)
-    const openMarkets = rawMarkets.filter((market: any) => {
+    const openMarkets: any[] = rawMarkets.filter((market: any) => {
       const isOpen = market.status === 'open' || market.status === 'Open' || market.status === 'OPEN';
       return isOpen;
     });
@@ -281,7 +281,7 @@ export async function refreshMarketPage(cursor?: string): Promise<{
     const marketObjects: Market[] = [];
     
     for (let index = 0; index < openMarkets.length; index++) {
-      const market = openMarkets[index];
+      const market: any = openMarkets[index];
       
       try {
         // Extract yes_bid_dollars and no_bid_dollars
