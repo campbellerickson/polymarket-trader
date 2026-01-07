@@ -5,7 +5,7 @@ import { MarketApi } from 'kalshi-typescript';
 
 /**
  * Check if a market has a simple yes/no question (not multiple questions)
- * Filters out markets with complex criteria like "yes X, yes Y, no Z"
+ * Filters out markets with multiple yes clauses or multiple no clauses
  */
 function isSimpleYesNoMarket(question: string): boolean {
   if (!question || question.length === 0) {
@@ -14,41 +14,20 @@ function isSimpleYesNoMarket(question: string): boolean {
 
   const questionLower = question.toLowerCase().trim();
   
-  // Skip if question is too long (likely complex)
-  if (question.length > 200) {
+  // Count occurrences of "yes" clauses (pattern: "yes" followed by text, possibly comma-separated)
+  // Match patterns like "yes X", "yes X:", "yes X,", "yes X: Y"
+  const yesMatches = questionLower.match(/\byes\s+[^,]+/gi) || [];
+  
+  // Count occurrences of "no" clauses (pattern: "no" followed by text, possibly comma-separated)
+  // Match patterns like "no X", "no X:", "no X,", "no X: Y"
+  const noMatches = questionLower.match(/\bno\s+[^,]+/gi) || [];
+  
+  // Filter out if there's more than one yes clause OR more than one no clause
+  if (yesMatches.length > 1 || noMatches.length > 1) {
     return false;
   }
   
-  // Count occurrences of "yes" and "no" keywords followed by colons or spaces
-  // Complex markets often have patterns like "yes X: Y, yes Z: W"
-  const yesPattern = /\b(yes|y)\s+[^,]+:/gi;
-  const noPattern = /\b(no|n)\s+[^,]+:/gi;
-  const yesMatches = questionLower.match(yesPattern) || [];
-  const noMatches = questionLower.match(noPattern) || [];
-  
-  // If there are multiple "yes" or "no" clauses, it's likely a complex market
-  if (yesMatches.length > 1 || noMatches.length > 1 || (yesMatches.length + noMatches.length) > 2) {
-    return false;
-  }
-  
-  // Check for multiple comma-separated conditions (common in complex markets)
-  const commaCount = (question.match(/,/g) || []).length;
-  if (commaCount > 2) {
-    // More than 2 commas likely indicates multiple conditions
-    return false;
-  }
-  
-  // Check for patterns like "yes X, yes Y" (multiple yes clauses)
-  if (questionLower.match(/\byes\s+[^,]+,/g) && questionLower.match(/\byes\s+[^,]+,/g)!.length > 1) {
-    return false;
-  }
-  
-  // Check for patterns like "no X, no Y" (multiple no clauses)
-  if (questionLower.match(/\bno\s+[^,]+,/g) && questionLower.match(/\bno\s+[^,]+,/g)!.length > 1) {
-    return false;
-  }
-  
-  // If it passes all checks, it's likely a simple yes/no market
+  // If it passes, it's a simple yes/no market (0-1 yes clauses, 0-1 no clauses)
   return true;
 }
 
