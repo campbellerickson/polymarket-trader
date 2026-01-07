@@ -173,7 +173,8 @@ export async function scanContracts(
         market_id: market.market_id,
         question: market.question,
         end_date: market.end_date,
-        current_odds: market.yes_odds,
+        yes_odds: market.yes_odds,
+        no_odds: market.no_odds || (1 - market.yes_odds),
         liquidity: liquidity, // True liquidity from orderbook (contracts available)
         volume_24h: market.volume_24h,
         category: market.category,

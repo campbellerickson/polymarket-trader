@@ -73,7 +73,7 @@ function buildAnalysisPrompt(request: AnalysisRequest, historicalContext: string
   const contractsList = request.contracts.map((c, i) => `
 ${i + 1}. Market ID: ${c.market_id}
    Question: ${c.question}
-   Current Odds: ${(c.current_odds * 100).toFixed(2)}%
+   Yes Odds: ${(c.yes_odds * 100).toFixed(2)}%, No Odds: ${((c.no_odds || (1 - c.yes_odds)) * 100).toFixed(2)}%
    Days to Resolution: ${Math.ceil((c.end_date.getTime() - Date.now()) / (1000 * 60 * 60 * 24))}
    Liquidity: $${c.liquidity.toFixed(2)}
    Volume (24h): $${(c.volume_24h || 0).toFixed(2)}
