@@ -333,7 +333,8 @@ export async function refreshMarketPage(cursor?: string): Promise<{
         resolved: resolved,
         category: market.category || market.event_ticker || undefined,
         outcome: outcome,
-        final_odds: market.last_price ? parseFloat(market.last_price.toString()) / 100 : undefined,
+        final_odds: market.last_price !== undefined && market.last_price !== null && market.last_price !== '' ? 
+          parseFloat(String(market.last_price)) / 100 : undefined,
         resolved_at: market.close_time ? new Date(market.close_time) : undefined,
       };
     }).filter((market): market is Market => market !== null); // Remove null values (complex markets)
