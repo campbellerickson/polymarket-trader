@@ -88,20 +88,36 @@ export async function cacheMarkets(markets: Market[]): Promise<void> {
   console.log(`💾 Caching ${markets.length} markets to database...`);
 
   // Upsert markets (update if exists, insert if not)
-  const rows = markets.map(market => ({
-    market_id: market.market_id,
-    question: market.question,
-    end_date: market.end_date.toISOString(),
-    current_odds: market.yes_odds,
-    category: market.category || null,
-    liquidity: market.liquidity || 0,
-    volume_24h: market.volume_24h || 0,
-    resolved: market.resolved || false,
-    outcome: market.outcome || null,
-    final_odds: market.final_odds || null,
-    resolved_at: market.resolved_at?.toISOString() || null,
-    discovered_at: new Date().toISOString(), // Update timestamp
-  }));
+  // Only include columns that exist in the database to avoid schema errors
+  const rows = markets.map(market => {
+    const row: any = {
+      market_id: market.market_id,
+      question: market.question,
+      end_date: market.end_date.toISOString(),
+      current_odds: market.yes_odds,
+      category: market.category || null,
+      liquidity: market.liquidity || 0,
+      volume_24h: market.volume_24h || 0,
+      discovered_at: new Date().toISOString(), // Update timestamp
+    };
+    
+    // Only add optional columns if they exist
+    // These will be added via migration, but we handle gracefully if not present yet
+    if (market.resolved !== undefined) {
+      row.resolved = market.resolved || false;
+    }
+    if (market.outcome) {
+      row.outcome = market.outcome;
+    }
+    if (market.final_odds !== undefined) {
+      row.final_odds = market.final_odds || null;
+    }
+    if (market.resolved_at) {
+      row.resolved_at = market.resolved_at.toISOString();
+    }
+    
+    return row;
+  });
 
   // Batch upsert in chunks of 100 (Supabase limit)
   const chunkSize = 100;
