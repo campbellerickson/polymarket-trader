@@ -1,6 +1,7 @@
 import { getMarket } from './client';
 import { getOpenTrades, updateTrade } from '../database/queries';
 import { Trade } from '../../types';
+import { sendResolutionAlert } from '../utils/notifications';
 
 export async function checkAndResolveOpenTrades(): Promise<void> {
   console.log('🔍 Checking for resolved trades...');
@@ -24,8 +25,24 @@ export async function checkAndResolveOpenTrades(): Promise<void> {
           pnl,
           resolved_at: market.resolved_at || new Date(),
         });
-        
+
         console.log(`${won ? '✅ WON' : '❌ LOST'}: ${trade.contract.question.substring(0, 50)}... | P&L: $${pnl.toFixed(2)}`);
+
+        // Send resolution alert
+        try {
+          const holdingPeriodHours = (Date.now() - new Date(trade.executed_at).getTime()) / (1000 * 60 * 60);
+          await sendResolutionAlert({
+            question: trade.contract.question,
+            outcome: won ? 'won' : 'lost',
+            entryOdds: trade.entry_odds,
+            exitOdds: market.final_odds || market.yes_odds,
+            pnl,
+            holdingPeriod: holdingPeriodHours,
+          });
+        } catch (err) {
+          console.error('Failed to send resolution alert:', err);
+          // Don't fail resolution if notification fails
+        }
       }
     } catch (error: any) {
       console.error(`   ⚠️ Error checking trade ${trade.id}:`, error.message);

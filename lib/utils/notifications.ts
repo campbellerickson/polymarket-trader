@@ -34,3 +34,48 @@ Current Bankroll: $${summary.current_bankroll.toFixed(2)}`;
   await sendSMS('admin', message);
 }
 
+export async function sendBuyAlert(trade: {
+  question: string;
+  side: string;
+  allocation: number;
+  odds: number;
+  reasoning: string;
+}): Promise<void> {
+  const message = `🟢 BUY ALERT
+
+${trade.question.substring(0, 100)}...
+
+Side: ${trade.side}
+Odds: ${(trade.odds * 100).toFixed(1)}%
+Amount: $${trade.allocation.toFixed(2)}
+
+Reason: ${trade.reasoning.substring(0, 150)}...`;
+
+  console.log('🟢 BUY ALERT:', message);
+  await sendSMS('admin', message);
+}
+
+export async function sendResolutionAlert(resolution: {
+  question: string;
+  outcome: 'won' | 'lost' | 'stopped';
+  entryOdds: number;
+  exitOdds: number;
+  pnl: number;
+  holdingPeriod: number; // hours
+}): Promise<void> {
+  const emoji = resolution.outcome === 'won' ? '🎉' : resolution.outcome === 'lost' ? '❌' : '⚠️';
+  const outcomeText = resolution.outcome.toUpperCase();
+
+  const message = `${emoji} RESOLUTION: ${outcomeText}
+
+${resolution.question.substring(0, 100)}...
+
+Entry: ${(resolution.entryOdds * 100).toFixed(1)}%
+Exit: ${(resolution.exitOdds * 100).toFixed(1)}%
+P&L: ${resolution.pnl >= 0 ? '+' : ''}$${resolution.pnl.toFixed(2)}
+Holding: ${resolution.holdingPeriod.toFixed(1)}h`;
+
+  console.log(`${emoji} RESOLUTION ALERT:`, message);
+  await sendSMS('admin', message);
+}
+

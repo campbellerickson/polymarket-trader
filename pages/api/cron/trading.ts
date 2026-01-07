@@ -5,7 +5,7 @@ import { executeTrades } from '../../../lib/kalshi/executor';
 import { checkAndResolveOpenTrades } from '../../../lib/kalshi/resolver';
 import { monitorStopLosses } from '../../../lib/trading/stop-loss';
 import { getRecentTrades, getCurrentBankroll } from '../../../lib/database/queries';
-import { sendDailySummary, sendErrorAlert } from '../../../lib/utils/notifications';
+import { sendDailySummary, sendErrorAlert, sendBuyAlert } from '../../../lib/utils/notifications';
 import { getAccountBalance } from '../../../lib/kalshi/client';
 import { TRADING_CONSTANTS } from '../../../config/constants';
 
@@ -89,6 +89,24 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     // 4. Execute trades
     const results = await executeTrades(analysis);
+
+    // 4.5 Send buy alerts for successful trades
+    for (const result of results) {
+      if (result.success && result.trade) {
+        try {
+          await sendBuyAlert({
+            question: result.trade.contract?.question || 'Unknown',
+            side: result.trade.side,
+            allocation: result.trade.position_size,
+            odds: result.trade.entry_odds,
+            reasoning: result.trade.ai_reasoning || 'No reasoning provided',
+          });
+        } catch (err) {
+          console.error('Failed to send buy alert:', err);
+          // Don't fail the whole job if notification fails
+        }
+      }
+    }
     
     // 5. Check stop losses BEFORE resolving trades
     console.log('🛡️ Checking stop losses...');
