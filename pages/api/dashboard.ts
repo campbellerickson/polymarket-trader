@@ -1,8 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { getRecentTrades, getOpenTrades, getCurrentBankroll, getInitialBankroll, getTradesInRange, getOpenPositions } from '../../lib/database/queries';
-import { getMarket, getAccountBalance } from '../../lib/kalshi/client';
+import { getRecentTrades, getInitialBankroll, getTradesInRange } from '../../lib/database/queries';
+import { getAccountBalance } from '../../lib/kalshi/client';
 import { calculateWinRate, calculateTotalPnL } from '../../lib/utils/metrics';
-import { getMonthlyAnalysis, getAllMonthlyAnalyses } from '../../lib/analysis/monthly';
 
 export default async function handler(
   req: NextApiRequest,
@@ -13,164 +12,105 @@ export default async function handler(
   }
 
   try {
-    console.log('📊 Dashboard: Fetching fresh data...');
+    console.log('📊 Dashboard: Fetching performance data...');
 
-    // Get LIVE account balance from Kalshi API (most accurate)
+    // Get LIVE account balance from Kalshi API
     let currentBankroll: number;
     try {
       currentBankroll = await getAccountBalance();
       console.log(`   ✅ Live Kalshi balance: $${currentBankroll.toFixed(2)}`);
     } catch (error) {
-      console.warn('   ⚠️ Failed to fetch live balance, using cached:', error);
-      currentBankroll = await getCurrentBankroll();
+      console.warn('   ⚠️ Failed to fetch live balance:', error);
+      throw new Error('Unable to fetch account balance from Kalshi');
     }
 
-    // Get all trades from database
-    const allTrades = await getRecentTrades(1000);
-    const resolvedTrades = allTrades.filter(t => t.status !== 'open' && t.status !== 'cancelled');
-
-    // Calculate metrics
     const initialBankroll = await getInitialBankroll();
+
+    // Get all resolved trades (exclude open and cancelled)
+    const allTrades = await getRecentTrades(1000);
+    const resolvedTrades = allTrades.filter(t =>
+      t.status === 'won' || t.status === 'lost' || t.status === 'stopped'
+    );
+
+    // Overall Performance
     const totalPnL = calculateTotalPnL(resolvedTrades);
     const totalReturn = initialBankroll > 0 ? (totalPnL / initialBankroll) * 100 : 0;
     const winRate = calculateWinRate(resolvedTrades);
 
-    console.log(`   Trades: ${allTrades.length} total, ${resolvedTrades.length} resolved`);
-    
-    // Get open trades
-    const openTrades = await getOpenTrades();
-    console.log(`   Open trades: ${openTrades.length}`);
+    console.log(`   Overall: $${totalPnL.toFixed(2)} P&L (${totalReturn.toFixed(2)}%)`);
+    console.log(`   Win rate: ${winRate.toFixed(1)}% (${resolvedTrades.length} trades)`);
 
-    // Get open positions with LIVE current odds from Kalshi
-    const openPositions = await getOpenPositions();
-    const positionsWithOdds = await Promise.all(
-      openPositions.map(async (pos) => {
-        try {
-          // Fetch LIVE market data from Kalshi
-          const market = await getMarket(pos.trade.contract.market_id);
-          const currentOdds = pos.trade.side === 'YES' ? market.yes_odds : market.no_odds;
-
-          // Calculate current position value
-          const currentValue = pos.trade.contracts_purchased * currentOdds;
-          const unrealizedPnL = currentValue - pos.trade.position_size;
-          const unrealizedPnLPct = pos.trade.position_size > 0
-            ? (unrealizedPnL / pos.trade.position_size) * 100
-            : 0;
-
-          console.log(`   Position: ${pos.trade.contract.market_id.substring(0, 30)}... | Entry: ${(pos.trade.entry_odds * 100).toFixed(1)}% | Current: ${(currentOdds * 100).toFixed(1)}% | P&L: $${unrealizedPnL.toFixed(2)}`);
-
-          return {
-            ...pos,
-            yes_odds: market.yes_odds,
-            no_odds: market.no_odds || (1 - market.yes_odds),
-            unrealized_pnl: unrealizedPnL,
-            unrealized_pnl_pct: unrealizedPnLPct,
-          };
-        } catch (error: any) {
-          console.error(`   ⚠️ Failed to fetch market ${pos.trade.contract.market_id}:`, error.message);
-          // If we can't fetch market, use entry odds (fallback)
-          return {
-            ...pos,
-            yes_odds: pos.trade.entry_odds,
-            no_odds: 1 - pos.trade.entry_odds,
-            unrealized_pnl: 0,
-            unrealized_pnl_pct: 0,
-          };
-        }
-      })
+    // Today's Performance
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    const todayTrades = await getTradesInRange(todayStart, new Date());
+    const todayResolved = todayTrades.filter(t =>
+      t.status === 'won' || t.status === 'lost' || t.status === 'stopped'
     );
+    const todayPnL = calculateTotalPnL(todayResolved);
 
-    // Calculate total unrealized P&L
-    const totalUnrealizedPnL = positionsWithOdds.reduce((sum, p) => sum + p.unrealized_pnl, 0);
-    console.log(`   Total unrealized P&L: $${totalUnrealizedPnL.toFixed(2)}`);
-    
-    // Calculate MTD (Month-to-Date)
-    const now = new Date();
-    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-    const mtdTrades = await getTradesInRange(monthStart, now);
-    const mtdResolved = mtdTrades.filter(t => t.status !== 'open' && t.status !== 'cancelled');
+    // Week Performance (last 7 days)
+    const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    const weekTrades = await getTradesInRange(weekAgo, new Date());
+    const weekResolved = weekTrades.filter(t =>
+      t.status === 'won' || t.status === 'lost' || t.status === 'stopped'
+    );
+    const weekPnL = calculateTotalPnL(weekResolved);
+
+    // Month-to-Date Performance
+    const monthStart = new Date();
+    monthStart.setDate(1);
+    monthStart.setHours(0, 0, 0, 0);
+    const mtdTrades = await getTradesInRange(monthStart, new Date());
+    const mtdResolved = mtdTrades.filter(t =>
+      t.status === 'won' || t.status === 'lost' || t.status === 'stopped'
+    );
     const mtdPnL = calculateTotalPnL(mtdResolved);
+    const mtdReturn = initialBankroll > 0 ? (mtdPnL / initialBankroll) * 100 : 0;
 
-    // Calculate MTD return based on actual bankroll at month start
-    const monthStartBankroll = initialBankroll; // Could be improved by tracking historical bankroll
-    const mtdReturn = monthStartBankroll > 0 ? (mtdPnL / monthStartBankroll) * 100 : 0;
-
-    console.log(`   MTD: ${mtdResolved.length} trades, $${mtdPnL.toFixed(2)} P&L (${mtdReturn.toFixed(2)}%)`);
-
-    // Calculate YTD (Year-to-Date)
-    const yearStart = new Date(now.getFullYear(), 0, 1);
-    const ytdTrades = await getTradesInRange(yearStart, now);
-    const ytdResolved = ytdTrades.filter(t => t.status !== 'open' && t.status !== 'cancelled');
+    // Year-to-Date Performance
+    const yearStart = new Date(new Date().getFullYear(), 0, 1);
+    const ytdTrades = await getTradesInRange(yearStart, new Date());
+    const ytdResolved = ytdTrades.filter(t =>
+      t.status === 'won' || t.status === 'lost' || t.status === 'stopped'
+    );
     const ytdPnL = calculateTotalPnL(ytdResolved);
     const ytdReturn = initialBankroll > 0 ? (ytdPnL / initialBankroll) * 100 : 0;
 
-    console.log(`   YTD: ${ytdResolved.length} trades, $${ytdPnL.toFixed(2)} P&L (${ytdReturn.toFixed(2)}%)`);
-    
-    // Get recent trades (last 20)
-    const recentTrades = allTrades.slice(0, 20);
-    
-    // Get monthly analyses (last 3 months)
-    // Handle missing table gracefully
-    let monthlyAnalyses: any[] = [];
-    let recentMonthlyAnalyses: any[] = [];
-    let lastMonthAnalysis: any = null;
-    
-    try {
-      monthlyAnalyses = await getAllMonthlyAnalyses();
-      recentMonthlyAnalyses = monthlyAnalyses.slice(0, 3);
-      
-      // Get current month analysis if available
-      const currentMonth = new Date().getMonth() + 1;
-      const currentYear = new Date().getFullYear();
-      lastMonthAnalysis = await getMonthlyAnalysis(
-        currentMonth === 1 ? currentYear - 1 : currentYear,
-        currentMonth === 1 ? 12 : currentMonth - 1
-      );
-    } catch (error: any) {
-      // Table doesn't exist yet - migrations haven't run
-      if (error.code === 'PGRST205' || error.message?.includes('monthly_analysis')) {
-        console.warn('⚠️ monthly_analysis table not found. Run migrations in Supabase.');
-        monthlyAnalyses = [];
-        recentMonthlyAnalyses = [];
-        lastMonthAnalysis = null;
-      } else {
-        throw error; // Re-throw other errors
-      }
-    }
-    
+    console.log(`   MTD: $${mtdPnL.toFixed(2)} (${mtdResolved.length} trades)`);
+    console.log(`   YTD: $${ytdPnL.toFixed(2)} (${ytdResolved.length} trades)`);
     console.log('✅ Dashboard data ready');
 
     return res.status(200).json({
-      // Live Kalshi balance
+      // Current balance
       currentBankroll,
       initialBankroll,
 
-      // Performance metrics
+      // Overall performance
       totalPnL,
       totalReturn,
       winRate,
-      totalTrades: allTrades.length,
-      resolvedTrades: resolvedTrades.length,
+      totalTrades: resolvedTrades.length,
 
-      // Open positions (with live odds)
-      openTrades: openTrades.length,
-      openPositions: positionsWithOdds,
-      totalUnrealizedPnL,
-
-      // Time-based metrics
-      mtdPnL,
-      mtdReturn,
-      mtdTrades: mtdResolved.length,
-      ytdPnL,
-      ytdReturn,
-      ytdTrades: ytdResolved.length,
-
-      // Recent activity
-      recentTrades,
-
-      // Monthly analysis
-      monthlyAnalyses: recentMonthlyAnalyses,
-      lastMonthAnalysis,
+      // Performance over time
+      today: {
+        pnl: todayPnL,
+        trades: todayResolved.length,
+      },
+      week: {
+        pnl: weekPnL,
+        trades: weekResolved.length,
+      },
+      mtd: {
+        pnl: mtdPnL,
+        return: mtdReturn,
+        trades: mtdResolved.length,
+      },
+      ytd: {
+        pnl: ytdPnL,
+        return: ytdReturn,
+        trades: ytdResolved.length,
+      },
 
       // Metadata
       lastUpdated: new Date().toISOString(),
