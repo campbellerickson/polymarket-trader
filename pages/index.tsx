@@ -9,13 +9,25 @@ interface DashboardData {
   totalReturn: number;
   winRate: number;
   totalTrades: number;
-  openTrades: number;
-  mtdPnL: number;
-  mtdReturn: number;
-  ytdPnL: number;
-  ytdReturn: number;
-  recentTrades: any[];
-  openPositions: any[];
+  today: {
+    pnl: number;
+    trades: number;
+  };
+  week: {
+    pnl: number;
+    trades: number;
+  };
+  mtd: {
+    pnl: number;
+    return: number;
+    trades: number;
+  };
+  ytd: {
+    pnl: number;
+    return: number;
+    trades: number;
+  };
+  lastUpdated: string;
 }
 
 export default function Dashboard() {
@@ -74,24 +86,6 @@ export default function Dashboard() {
 
   if (!data) return null;
 
-  // Calculate trade status breakdown
-  const resolvedTrades = data.recentTrades.filter(t => t.status !== 'open');
-  const notStarted = 0; // Not applicable for trading
-  const inProgress = data.openTrades;
-  const onReview = 0; // Not applicable
-  const completed = resolvedTrades.filter(t => t.status === 'won').length;
-  const lost = resolvedTrades.filter(t => t.status === 'lost').length;
-  const stopped = resolvedTrades.filter(t => t.status === 'stopped').length;
-  
-  const totalStatus = data.totalTrades;
-  const completedPct = totalStatus > 0 ? (completed / totalStatus) * 100 : 0;
-  const lostPct = totalStatus > 0 ? (lost / totalStatus) * 100 : 0;
-  const stoppedPct = totalStatus > 0 ? (stopped / totalStatus) * 100 : 0;
-  const inProgressPct = totalStatus > 0 ? (inProgress / totalStatus) * 100 : 0;
-
-  // Calculate change vs yesterday (placeholder - would need historical data)
-  const changeVsYesterday: number | null = data.totalReturn > 0 ? 12 : -5;
-
   return (
     <>
       <Head>
@@ -119,7 +113,7 @@ export default function Dashboard() {
         <div className="card">
           <div className="card-header">
             <div>
-              <div className="card-title">Current total</div>
+              <div className="card-title">Account Balance</div>
               <div className="card-value">${data.currentBankroll.toFixed(2)}</div>
             </div>
           </div>
@@ -136,81 +130,48 @@ export default function Dashboard() {
                 {data.totalReturn >= 0 ? '+' : ''}{data.totalReturn.toFixed(2)}%
               </span>
             </div>
-            {changeVsYesterday !== null && changeVsYesterday !== 0 && (
-              <div className="metric">
-                <span className="metric-label">vs Yesterday</span>
-                <div className={`performance-indicator ${changeVsYesterday >= 0 ? 'up' : 'down'}`}>
-                  {changeVsYesterday >= 0 ? '↑' : '↓'}
-                  <span>{Math.abs(changeVsYesterday)}%</span>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Trade Status Breakdown */}
-        <div className="card">
-          <div className="card-header">
-            <div>
-              <div className="card-title">Current total</div>
-              <div className="card-value">{data.totalTrades} Trades</div>
+            <div className="metric">
+              <span className="metric-label">Win Rate</span>
+              <span className="metric-value">{data.winRate.toFixed(1)}%</span>
             </div>
           </div>
-          {totalStatus > 0 && (
-            <>
-              <div className="progress-bar">
-                {completedPct > 0 && (
-                  <div className="progress-segment green" style={{ width: `${completedPct}%` }}></div>
-                )}
-                {lostPct > 0 && (
-                  <div className="progress-segment red" style={{ width: `${lostPct}%` }}></div>
-                )}
-                {stoppedPct > 0 && (
-                  <div className="progress-segment yellow" style={{ width: `${stoppedPct}%` }}></div>
-                )}
-                {inProgressPct > 0 && (
-                  <div className="progress-segment blue" style={{ width: `${inProgressPct}%` }}></div>
-                )}
-              </div>
-              <div className="legend">
-                {completed > 0 && (
-                  <div className="legend-item">
-                    <div className="legend-dot" style={{ background: '#10b981' }}></div>
-                    <span>Won: {completed} trades</span>
-                  </div>
-                )}
-                {lost > 0 && (
-                  <div className="legend-item">
-                    <div className="legend-dot" style={{ background: '#ef4444' }}></div>
-                    <span>Lost: {lost} trades</span>
-                  </div>
-                )}
-                {stopped > 0 && (
-                  <div className="legend-item">
-                    <div className="legend-dot" style={{ background: '#eab308' }}></div>
-                    <span>Stopped: {stopped} trades</span>
-                  </div>
-                )}
-                {inProgress > 0 && (
-                  <div className="legend-item">
-                    <div className="legend-dot" style={{ background: '#3b82f6' }}></div>
-                    <span>Open: {inProgress} trades</span>
-                  </div>
-                )}
-              </div>
-            </>
-          )}
         </div>
 
-        {/* Performance Metrics */}
+        {/* Performance Over Time */}
+        <h2 className="section-title" style={{ marginTop: '2rem' }}>Performance Over Time</h2>
+
+        {/* Today & This Week */}
         <div className="grid">
           <div className="card">
-            <div className="card-title">Win Rate</div>
-            <div className="card-value">{(data.winRate * 100).toFixed(1)}%</div>
+            <div className="card-title">Today</div>
+            <div className="metric-grid">
+              <div className="metric">
+                <span className="metric-label">P&L</span>
+                <span className={`metric-value ${data.today.pnl >= 0 ? 'positive' : 'negative'}`}>
+                  {data.today.pnl >= 0 ? '+' : ''}${data.today.pnl.toFixed(2)}
+                </span>
+              </div>
+              <div className="metric">
+                <span className="metric-label">Trades</span>
+                <span className="metric-value">{data.today.trades}</span>
+              </div>
+            </div>
           </div>
+
           <div className="card">
-            <div className="card-title">Open Positions</div>
-            <div className="card-value">{data.openTrades}</div>
+            <div className="card-title">This Week</div>
+            <div className="metric-grid">
+              <div className="metric">
+                <span className="metric-label">P&L</span>
+                <span className={`metric-value ${data.week.pnl >= 0 ? 'positive' : 'negative'}`}>
+                  {data.week.pnl >= 0 ? '+' : ''}${data.week.pnl.toFixed(2)}
+                </span>
+              </div>
+              <div className="metric">
+                <span className="metric-label">Trades</span>
+                <span className="metric-value">{data.week.trades}</span>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -221,15 +182,19 @@ export default function Dashboard() {
             <div className="metric-grid">
               <div className="metric">
                 <span className="metric-label">P&L</span>
-                <span className={`metric-value ${data.mtdPnL >= 0 ? 'positive' : 'negative'}`}>
-                  {data.mtdPnL >= 0 ? '+' : ''}${data.mtdPnL.toFixed(2)}
+                <span className={`metric-value ${data.mtd.pnl >= 0 ? 'positive' : 'negative'}`}>
+                  {data.mtd.pnl >= 0 ? '+' : ''}${data.mtd.pnl.toFixed(2)}
                 </span>
               </div>
               <div className="metric">
                 <span className="metric-label">Return</span>
-                <span className={`metric-value ${data.mtdReturn >= 0 ? 'positive' : 'negative'}`}>
-                  {data.mtdReturn >= 0 ? '+' : ''}{data.mtdReturn.toFixed(2)}%
+                <span className={`metric-value ${data.mtd.return >= 0 ? 'positive' : 'negative'}`}>
+                  {data.mtd.return >= 0 ? '+' : ''}{data.mtd.return.toFixed(2)}%
                 </span>
+              </div>
+              <div className="metric">
+                <span className="metric-label">Trades</span>
+                <span className="metric-value">{data.mtd.trades}</span>
               </div>
             </div>
           </div>
@@ -239,116 +204,28 @@ export default function Dashboard() {
             <div className="metric-grid">
               <div className="metric">
                 <span className="metric-label">P&L</span>
-                <span className={`metric-value ${data.ytdPnL >= 0 ? 'positive' : 'negative'}`}>
-                  {data.ytdPnL >= 0 ? '+' : ''}${data.ytdPnL.toFixed(2)}
+                <span className={`metric-value ${data.ytd.pnl >= 0 ? 'positive' : 'negative'}`}>
+                  {data.ytd.pnl >= 0 ? '+' : ''}${data.ytd.pnl.toFixed(2)}
                 </span>
               </div>
               <div className="metric">
                 <span className="metric-label">Return</span>
-                <span className={`metric-value ${data.ytdReturn >= 0 ? 'positive' : 'negative'}`}>
-                  {data.ytdReturn >= 0 ? '+' : ''}{data.ytdReturn.toFixed(2)}%
+                <span className={`metric-value ${data.ytd.return >= 0 ? 'positive' : 'negative'}`}>
+                  {data.ytd.return >= 0 ? '+' : ''}{data.ytd.return.toFixed(2)}%
                 </span>
+              </div>
+              <div className="metric">
+                <span className="metric-label">Trades</span>
+                <span className="metric-value">{data.ytd.trades}</span>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Recent Trades */}
-        <div className="card">
-          <div className="card-header">
-            <div className="card-title">Recent Trades</div>
-          </div>
-          <div className="table-wrapper">
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>Date</th>
-                  <th>Contract</th>
-                  <th>Side</th>
-                  <th>Size</th>
-                  <th>Status</th>
-                  <th>P&L</th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.recentTrades.slice(0, 10).map((trade: any) => (
-                  <tr key={trade.id}>
-                    <td>{new Date(trade.executed_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</td>
-                    <td style={{ maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {trade.contract?.question || 'N/A'}
-                    </td>
-                    <td>
-                      <span className={`badge ${trade.side === 'YES' ? 'success' : 'info'}`}>
-                        {trade.side}
-                      </span>
-                    </td>
-                    <td>${trade.position_size.toFixed(0)}</td>
-                    <td>
-                      <span className={`badge ${
-                        trade.status === 'won' ? 'success' :
-                        trade.status === 'lost' ? 'danger' :
-                        trade.status === 'stopped' ? 'warning' : 'info'
-                      }`}>
-                        {trade.status}
-                      </span>
-                    </td>
-                    <td className={trade.pnl && trade.pnl >= 0 ? 'positive' : 'negative'}>
-                      {trade.pnl ? (trade.pnl >= 0 ? '+' : '') + '$' + trade.pnl.toFixed(2) : '-'}
-                    </td>
-                  </tr>
-                ))}
-                {data.recentTrades.length === 0 && (
-                  <tr>
-                    <td colSpan={6} className="empty-state">
-                      <p>No trades yet</p>
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+        {/* Last Updated */}
+        <div style={{ textAlign: 'center', marginTop: '2rem', opacity: 0.6, fontSize: '0.875rem' }}>
+          Last updated: {new Date(data.lastUpdated).toLocaleString()}
         </div>
-
-        {/* Open Positions */}
-        {data.openPositions.length > 0 && (
-          <div className="card">
-            <div className="card-header">
-              <div className="card-title">Open Positions</div>
-            </div>
-            <div className="table-wrapper">
-              <table className="table">
-                <thead>
-                  <tr>
-                    <th>Contract</th>
-                    <th>Side</th>
-                    <th>Entry</th>
-                    <th>Current</th>
-                    <th>P&L</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.openPositions.map((pos: any) => (
-                    <tr key={pos.trade.id}>
-                      <td style={{ maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {pos.trade.contract?.question || 'N/A'}
-                      </td>
-                      <td>
-                        <span className={`badge ${pos.trade.side === 'YES' ? 'success' : 'info'}`}>
-                          {pos.trade.side}
-                        </span>
-                      </td>
-                      <td>{(pos.trade.entry_odds * 100).toFixed(0)}%</td>
-                      <td>{(pos.yes_odds * 100).toFixed(0)}%</td>
-                      <td className={pos.unrealized_pnl >= 0 ? 'positive' : 'negative'}>
-                        {pos.unrealized_pnl >= 0 ? '+' : ''}${pos.unrealized_pnl.toFixed(2)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
       </div>
 
       <BottomNav />
