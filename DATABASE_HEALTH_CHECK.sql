@@ -32,9 +32,9 @@ BEGIN
     FOREACH table_name IN ARRAY required_tables
     LOOP
         SELECT COUNT(*) INTO table_count
-        FROM information_schema.tables
-        WHERE table_schema = 'public'
-        AND table_name = table_name;
+        FROM information_schema.tables t
+        WHERE t.table_schema = 'public'
+        AND t.table_name = table_name;
         
         IF table_count = 0 THEN
             missing_tables := array_append(missing_tables, table_name);
@@ -80,33 +80,33 @@ BEGIN
     
     FOR key IN SELECT jsonb_object_keys(required_cols)
     LOOP
-        SELECT column_name INTO col_name
-        FROM information_schema.columns
-        WHERE table_schema = 'public'
-        AND table_name = 'contracts'
-        AND column_name = key;
+        SELECT c.column_name INTO col_name
+        FROM information_schema.columns c
+        WHERE c.table_schema = 'public'
+        AND c.table_name = 'contracts'
+        AND c.column_name = key;
         
         IF col_name IS NULL THEN
             missing_cols := array_append(missing_cols, key);
             RAISE NOTICE '❌ Missing column: contracts.%', key;
         ELSE
             -- Check data type
-            SELECT data_type INTO col_type
-            FROM information_schema.columns
-            WHERE table_schema = 'public'
-            AND table_name = 'contracts'
-            AND column_name = key;
+            SELECT c.data_type INTO col_type
+            FROM information_schema.columns c
+            WHERE c.table_schema = 'public'
+            AND c.table_name = 'contracts'
+            AND c.column_name = key;
             
             RAISE NOTICE '✅ Column exists: contracts.% (type: %)', key, col_type;
         END IF;
     END LOOP;
     
     -- Check for deprecated current_odds column
-    SELECT column_name INTO col_name
-    FROM information_schema.columns
-    WHERE table_schema = 'public'
-    AND table_name = 'contracts'
-    AND column_name = 'current_odds';
+    SELECT c.column_name INTO col_name
+    FROM information_schema.columns c
+    WHERE c.table_schema = 'public'
+    AND c.table_name = 'contracts'
+    AND c.column_name = 'current_odds';
     
     IF col_name IS NOT NULL THEN
         RAISE NOTICE '';
@@ -133,11 +133,11 @@ BEGIN
     
     FOREACH col IN ARRAY required_cols
     LOOP
-        SELECT column_name INTO col_name
-        FROM information_schema.columns
-        WHERE table_schema = 'public'
-        AND table_name = 'trades'
-        AND column_name = col;
+        SELECT c.column_name INTO col_name
+        FROM information_schema.columns c
+        WHERE c.table_schema = 'public'
+        AND c.table_name = 'trades'
+        AND c.column_name = col;
         
         IF col_name IS NULL THEN
             RAISE NOTICE '❌ Missing column: trades.%', col;
