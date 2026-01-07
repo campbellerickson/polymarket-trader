@@ -5,7 +5,7 @@
       "schedule": "0 7 * * *"
     },
     {
-      "path": "/pages/api/cron/daily-scan",
+      "path": "/pages/api/cron/trading",
       "schedule": "0 8 * * *"
     },
     {
@@ -17,8 +17,8 @@
       "schedule": "0 */6 * * *"
     },
     {
-      "path": "/pages/api/cron/refresh-markets",
-      "schedule": "*/5 * * * *"
+      "path": "/pages/api/cron/screen-markets",
+      "schedule": "30 7 * * *"
     },
     {
       "path": "/pages/api/cron/monthly-analysis",

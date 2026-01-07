@@ -69,7 +69,7 @@ See [PROJECT_STRUCTURE.md](./PROJECT_STRUCTURE.md) for details.
 ## API Endpoints
 
 ### Trading (Protected)
-- `POST /api/cron/daily-scan` - Main trading cycle (daily at 8 AM)
+- `POST /api/cron/trading` - Main trading cycle (daily at 8 AM)
 - `POST /api/cron/stop-loss` - Monitor positions (every 2 hours)
 - `POST /api/cron/refresh-markets` - Market cache refresh (every 5 min)
 

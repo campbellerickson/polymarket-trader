@@ -18,7 +18,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   let contracts: any[] = [];
   
   try {
-    console.log('🔍 Starting daily scan...');
+    console.log('🔍 Starting trading job...');
     
     // 1. Scan for contracts
     contracts = await scanContracts({
@@ -88,7 +88,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     });
     
   } catch (error: any) {
-    console.error('❌ Cron job failed:', error);
+    console.error('❌ Trading job failed:', error);
     console.error('   Stack:', error.stack);
     console.error('   Error details:', JSON.stringify({
       message: error.message,
@@ -97,7 +97,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }, null, 2));
     
     const { logCronError } = await import('../../../lib/utils/logger');
-    await logCronError('daily-scan', error, { contracts_analyzed: contracts?.length });
+    await logCronError('trading', error, { contracts_analyzed: contracts?.length });
     await sendErrorAlert(error);
     
     // Return detailed error for debugging

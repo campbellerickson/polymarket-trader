@@ -129,7 +129,7 @@ kalshi-trader/
 ## Key Files Explained
 
 ### Entry Points
-- **`pages/api/cron/daily-scan.ts`** - Main trading cycle
+- **`pages/api/cron/trading.ts`** - Main trading cycle
 - **`pages/index.tsx`** - Dashboard UI
 - **`lib/kalshi/scanner.ts`** - Contract discovery
 

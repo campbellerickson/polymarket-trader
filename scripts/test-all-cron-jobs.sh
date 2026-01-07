@@ -65,7 +65,7 @@ sleep 5
 # 2. Daily scan (main trading logic - invests up to $100)
 echo -e "${BLUE}Step 2: Daily Scan & Trade Execution${NC}"
 echo -e "${YELLOW}This will execute trades with a $100 daily budget${NC}"
-call_endpoint "Daily Scan" "/api/cron/daily-scan"
+call_endpoint "Trading" "/api/cron/trading"
 
 # 3. Check resolutions
 echo -e "${BLUE}Step 3: Checking Market Resolutions${NC}"

@@ -311,7 +311,7 @@ Open Positions → Stop Loss Monitor → Order Execution → Trade Update
 
 ### Trading APIs (Protected)
 
-#### `POST /api/cron/daily-scan`
+#### `POST /api/cron/trading`
 **Schedule:** Daily at 8:00 AM  
 **Purpose:** Main trading cycle
 
@@ -565,7 +565,7 @@ unrealized_pnl = (current_odds * contracts) - position_size
 | Cron | Schedule | Purpose |
 |------|----------|---------|
 | `refresh-markets` | Every 5 min | Maintain market cache |
-| `daily-scan` | Daily 8:00 AM | Main trading cycle |
+| `trading` | Daily 8:00 AM | Main trading cycle |
 | `stop-loss` | Every 2 hours | Monitor positions |
 | `check-resolutions` | Every 6 hours | Update resolved trades |
 | `monthly-analysis` | 1st of month | Generate monthly report |
@@ -631,7 +631,7 @@ Monthly:
          │               └──────────────┘
          ▼
 ┌─────────────────┐      ┌──────────────┐
-│ Contract        │◄─────│ daily-scan   │
+│ Contract        │◄─────│ trading   │
 │ Scanner         │      │ cron         │
 └────────┬────────┘      └──────────────┘
          │

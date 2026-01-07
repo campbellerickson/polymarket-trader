@@ -4,14 +4,18 @@ import { cacheMarkets } from '../../../lib/kalshi/cache';
 import { TRADING_CONSTANTS } from '../../../config/constants';
 
 /**
- * Efficient market screening cron job
- * Uses 4-phase screening strategy:
+ * Daily market screening cron job
+ * Runs once per day (7:30 AM) before the daily scan (8:00 AM)
+ * 
+ * Uses 4-phase efficient screening strategy:
  * 1. Bulk Load - Fetches all open markets (1-2 API calls)
- * 2. Basic Filter - Filters by volume, spread, timing (in-memory)
- * 3. Rank - Sorts by liquidity score (in-memory)
+ * 2. Basic Filter - Filters by volume, spread, timing (in-memory, 0 API calls)
+ * 3. Rank - Sorts by liquidity score (in-memory, 0 API calls)
  * 4. Depth Check - Validates execution quality for top candidates (30-50 API calls)
  * 
- * Total: ~35-55 API calls per run (well within rate limits)
+ * Total: ~35-55 API calls per run
+ * 
+ * This populates the cache with tradeable markets that the daily scan will use.
  */
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   // Verify cron secret
@@ -20,7 +24,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    console.log('🔄 Starting efficient market screening...');
+    console.log('🚀 Starting daily market screening...');
+    console.log('   This runs once per day (7:30 AM) to identify all tradeable markets');
+    console.log('   Results are cached for the daily scan (8:00 AM) to use');
     
     // Configure screening criteria
     const criteria: MarketCriteria = {
@@ -33,14 +39,27 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       maxDaysToResolution: TRADING_CONSTANTS.MAX_DAYS_TO_RESOLUTION,
     };
     
+    console.log('   Screening criteria:', {
+      minVolume24h: criteria.minVolume24h,
+      minOpenInterest: criteria.minOpenInterest,
+      maxSpreadCents: criteria.maxSpreadCents,
+      orderSize: criteria.orderSize,
+      topNForDepthCheck: criteria.topNForDepthCheck,
+      minOdds: criteria.minOdds,
+      maxDaysToResolution: criteria.maxDaysToResolution,
+    });
+    
     // Run screening
     const screener = new KalshiMarketScreener();
     const screenedMarkets = await screener.screenMarkets(criteria);
     
-    // Cache the screened markets
+    // Cache the screened markets for the daily scan to use
     if (screenedMarkets.length > 0) {
+      console.log(`💾 Caching ${screenedMarkets.length} screened markets for daily scan...`);
       await cacheMarkets(screenedMarkets);
-      console.log(`✅ Cached ${screenedMarkets.length} screened markets`);
+      console.log(`✅ Cached ${screenedMarkets.length} screened markets successfully`);
+    } else {
+      console.log('⚠️ No markets passed screening criteria');
     }
     
     // Generate summary
@@ -49,23 +68,26 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     
     return res.status(200).json({
       success: true,
+      timestamp: new Date().toISOString(),
+      marketsScreened: screenedMarkets.length,
       marketsCached: screenedMarkets.length,
-      message: `Screened and cached ${screenedMarkets.length} tradeable markets`,
+      message: `Screened and cached ${screenedMarkets.length} tradeable markets for daily scan`,
       summary: {
         totalMarkets: screenedMarkets.length,
         topMarkets: screenedMarkets.slice(0, 10).map(m => ({
           market_id: m.market_id,
           question: m.question.substring(0, 80),
-          yes_odds: (m.yes_odds * 100).toFixed(1) + '%',
-          no_odds: (m.no_odds * 100).toFixed(1) + '%',
+          yes_odds: `${(m.yes_odds * 100).toFixed(1)}%`,
+          no_odds: `${(m.no_odds * 100).toFixed(1)}%`,
           liquidityScore: m.liquidityScore.toFixed(1),
           orderbookLiquidity: m.orderbookLiquidity || 'N/A',
+          screeningRank: m.screeningRank,
         })),
       },
     });
 
   } catch (error: any) {
-    console.error('❌ Market screening cron failed:', error);
+    console.error('❌ Daily market screening failed:', error);
     
     // If rate limited, return success but with wait message
     if (error.message.includes('rate') || error.message.includes('429') || error.response?.status === 429) {
@@ -73,16 +95,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         success: false,
         error: 'Rate limited',
         message: 'Will retry on next scheduled run',
-        retryAfter: error.message.includes('Wait') ? error.message : '5000ms',
+        retryAfter: error.message.includes('Wait') ? error.message : 'Next day',
       });
     }
     
     const { logCronError } = await import('../../../lib/utils/logger');
-    await logCronError('refresh-markets', error);
+    await logCronError('screen-markets', error);
     
     return res.status(500).json({ 
       success: false,
-      error: error.message 
+      error: error.message,
+      timestamp: new Date().toISOString(),
     });
   }
 }
