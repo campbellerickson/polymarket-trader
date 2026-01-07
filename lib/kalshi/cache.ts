@@ -111,19 +111,41 @@ export async function getCachedMarkets(): Promise<Market[]> {
       noOdds = yesOdds > 0 ? (1 - yesOdds) : 0;
     }
     
+    // Safely parse end_date
+    let endDate: Date;
+    try {
+      if (row.end_date) {
+        endDate = new Date(row.end_date);
+        if (isNaN(endDate.getTime())) {
+          endDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // Default to 7 days from now
+        }
+      } else {
+        endDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+      }
+    } catch (e) {
+      endDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+    }
+    
     return {
-      market_id: row.market_id,
-      question: row.question,
-      end_date: new Date(row.end_date),
+      market_id: row.market_id || '',
+      question: row.question || '',
+      end_date: endDate,
       yes_odds: yesOdds,
       no_odds: noOdds,
     liquidity: row.liquidity !== undefined && row.liquidity !== null ? parseFloat(String(row.liquidity)) : 0,
     volume_24h: row.volume_24h !== undefined && row.volume_24h !== null ? parseFloat(String(row.volume_24h)) : 0,
-    resolved: row.resolved || false,
+    resolved: row.resolved === true || row.resolved === 'true' || false,
     category: row.category || undefined,
     outcome: row.outcome || undefined,
     final_odds: row.final_odds !== undefined && row.final_odds !== null ? parseFloat(String(row.final_odds)) : undefined,
-    resolved_at: row.resolved_at ? new Date(row.resolved_at) : undefined,
+    resolved_at: row.resolved_at ? (() => {
+      try {
+        const date = new Date(row.resolved_at);
+        return isNaN(date.getTime()) ? undefined : date;
+      } catch (e) {
+        return undefined;
+      }
+    })() : undefined,
     };
   });
 }
