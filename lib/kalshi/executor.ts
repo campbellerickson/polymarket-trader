@@ -20,9 +20,11 @@ export async function executeTrades(
       const orderbook = await getOrderbook(decision.contract.market_id);
       
       // 2. Calculate contracts to purchase
+      // Use yes_odds for calculations (convert from 0-1 to cents if needed)
+      const entryOdds = decision.contract.yes_odds || 0;
       const contracts = calculateContractAmount(
         decision.allocation,
-        decision.contract.current_odds
+        entryOdds
       );
       
       // 3. Execute market order
@@ -30,7 +32,7 @@ export async function executeTrades(
         market: decision.contract.market_id,
         side: 'YES', // Always buying high side
         amount: contracts,
-        price: orderbook.bestYesAsk || decision.contract.current_odds,
+        price: orderbook.bestYesAsk || entryOdds,
       });
       
       if (TRADING_CONSTANTS.DRY_RUN) {
@@ -42,7 +44,7 @@ export async function executeTrades(
       // 4. Log to database
       const trade = await logTrade({
         contract_id: decision.contract.id || '', // Should be set from scanner
-        entry_odds: decision.contract.current_odds,
+        entry_odds: entryOdds, // Use yes_odds for entry
         position_size: decision.allocation,
         side: 'YES',
         contracts_purchased: contracts,
