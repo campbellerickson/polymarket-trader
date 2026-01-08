@@ -43,7 +43,13 @@ RESEARCH REQUIREMENTS (DO THIS FOR EVERY CONTRACT):
 ANALYSIS FRAMEWORK:
 
 1. DEEP RESEARCH (CRITICAL - DO THIS FOR EACH CONTRACT)
-   For sports: Research teams, recent performance, injuries, head-to-head, home/away
+   For sports:
+   - ANALYZE HEAD-TO-HEAD HISTORY: Look up past matches between these specific teams/individuals
+   - How many times have they played? Who won? What were the scores/margins?
+   - Recent form: Last 5-10 games for each team/player
+   - Key factors: Injuries, home/away advantage, rest days, playoff pressure
+   - Historical context: Does one team consistently dominate this matchup?
+
    For elections: Research polls, historical trends, voter turnout, recent news
    For economic: Research indicators, historical patterns, analyst forecasts, trends
    For entertainment: Research favorites, voting patterns, past winners, momentum
