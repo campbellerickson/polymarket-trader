@@ -1,48 +1,15 @@
 {
   "crons": [
     {
-      "path": "/api/cron/morning-report",
-      "schedule": "0 7 * * *"
-    },
-    {
-      "path": "/api/cron/trading",
-      "schedule": "0 8 * * *"
-    },
-    {
-      "path": "/api/cron/stop-loss",
-      "schedule": "*/30 * * * *"
-    },
-    {
-      "path": "/api/cron/check-fills",
-      "schedule": "*/30 * * * *"
-    },
-    {
-      "path": "/api/cron/check-resolutions",
+      "path": "/api/cron/trader",
       "schedule": "0 * * * *"
     },
     {
-      "path": "/api/cron/screen-markets",
-      "schedule": "30 7 * * *"
-    },
-    {
-      "path": "/api/cron/monthly-analysis",
-      "schedule": "0 0 1 * *"
-    },
-    {
-      "path": "/api/cron/cleanup-resolved",
-      "schedule": "0 2 * * *"
-    },
-    {
-      "path": "/api/cron/sync-orders",
-      "schedule": "0 10,16 * * *"
-    },
-    {
-      "path": "/api/cron/sync-outcomes",
-      "schedule": "0 3 * * *"
+      "path": "/api/cron/sync",
+      "schedule": "*/15 * * * *"
     }
   ],
   "framework": "nextjs",
   "buildCommand": "next build",
   "outputDirectory": ".next"
 }
-
