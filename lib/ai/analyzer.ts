@@ -91,55 +91,54 @@ CURRENT SITUATION:
 - Daily Budget: $${request.dailyBudget}
 - Contracts Available: ${request.contracts.length}
 
-AVAILABLE CONTRACTS:
+AVAILABLE CONTRACTS (Pre-filtered to 85-95% odds, good liquidity, <2 days to resolution):
 ${contractsList}
 
-Analyze these contracts and select 0-3 contracts based on quality.
+RESEARCH each contract deeply and SELECT THE BEST 1-3 opportunities to trade.
 
-STRATEGY: YIELD FARMING (OVERPRICED TAIL RISK)
-- Markets OVERPRICE black swan risk due to fear and recency bias
-- When odds show 90/10, true odds are often more like 95-98/2-5
-- Your job: Research to find where 10% tail risk is really only 2-5%
-- Target: Markets at 90%+ where tail risk is fear-based, not reality-based
-- These are chaotic markets, but VARIANCE ≠ UNCERTAINTY
-- Favor: Volatile markets where research reveals outcome is clearer than odds suggest
-- You CAN select 0 contracts if tail risk seems fairly priced
-- You CAN select up to 3 if multiple clear overpriced tail risk opportunities exist
+YOUR TASK:
+1. RESEARCH each contract thoroughly (understand the actual event, teams, polls, factors)
+2. ANALYZE the odds (is market pricing fair or is there edge based on research?)
+3. CONSIDER exit timing (when does it resolve? Can we exit early with profit?)
+4. IDENTIFY specific risks (what could go wrong? How likely?)
+5. COMPARE all contracts and RANK them (which are BEST?)
+6. SELECT the top 1-3 contracts with best risk/reward
 
-IMPORTANT: For EVERY contract (both selected AND rejected), provide reasoning.
+IMPORTANT: For EVERY contract (both selected AND rejected), provide detailed reasoning.
 
 Return JSON in this format:
 {
   "selected_contracts": [
     {
       "market_id": "...",
-      "allocation": 30,
-      "confidence": 0.95,
-      "reasoning": "Why this meets the ultra-high quality bar",
-      "risk_factors": ["risk1", "risk2"]
+      "allocation": 35,
+      "confidence": 0.92,
+      "reasoning": "RESEARCH-BASED: [What you researched] [What edge you found] [Exit timing] [Why this is BETTER than other options]",
+      "risk_factors": ["Specific risk 1", "Specific risk 2"]
     }
   ],
   "rejected_contracts": [
     {
       "market_id": "...",
-      "reasoning": "Why you're NOT trading this (be specific)"
+      "reasoning": "Why you didn't select this - be specific about research findings or why other contracts were better"
     }
   ],
-  "strategy_notes": "Overall assessment of today's opportunities"
+  "strategy_notes": "Summary of research findings and rationale for your selections"
 }
 
 Guidelines:
-- Select 0-3 contracts (only trade when tail risk is clearly overpriced)
-- You are the steward of this capital - allocate based on your conviction
-- Daily budget available: $${request.dailyBudget} (you do NOT need to use it all)
-- Allocate based on edge: higher allocation = more confident tail risk is overpriced
-- Suggested range: $10-50 per contract (but use your judgment)
-- Prioritize RESEARCH QUALITY - identify when 10% tail is really 2%
-- Embrace volatile markets - variance creates fear-based mispricing
-- Look for markets where fear exceeds reality (overpriced black swan risk)
-- Target >10:1 odds (>90% probability markets) where tail risk is inflated
-- Consider historical base rates - how often do these "surprises" actually happen?
-- BE SPECIFIC about why tail risk is overpriced and your edge
+- SELECT 1-3 of the BEST contracts presented (your job is to pick winners, not pass on everything)
+- RESEARCH each contract - understand the actual event, not just the numbers
+- Daily budget: $${request.dailyBudget} - allocate most/all to your top picks
+- Position sizing: $20-50 per contract based on quality ranking
+  * Best opportunity: $40-50
+  * Good opportunity: $30-40
+  * Acceptable opportunity: $20-30
+- COMPARE contracts - which have best combination of edge, timing, lower risk?
+- EXIT TIMING - consider opportunities to exit early if odds move 2-3% in our favor
+- Some risk is OK and expected - focus on finding the BEST risk/reward available
+- BE SPECIFIC in reasoning - what research did you do? What edge did you find?
+- Use historical learning - favor contract types that worked, avoid types that failed
 `.trim();
 }
 
@@ -166,15 +165,15 @@ function parseAIResponse(text: string, contracts: Contract[], dailyBudget: numbe
 
       return {
         contract,
-        allocation: Math.min(Math.max(sc.allocation, 10), 50), // Clamp between 10-50 (AI has flexibility)
+        allocation: Math.min(Math.max(sc.allocation, 20), 50), // Clamp between 20-50 (new active trading range)
         confidence: Math.min(Math.max(sc.confidence, 0), 1), // Clamp between 0-1
         reasoning: sc.reasoning || 'No reasoning provided',
         riskFactors: sc.risk_factors || [],
       };
     });
 
-    // Allow 0-3 selections (hyper-conservative approach)
-    // Note: Separate logic will enforce "1 trade minimum every 2 days"
+    // Allow 1-3 selections (active trading approach - AI should pick best opportunities)
+    // Cap at 3 to maintain focus and risk management
     if (selectedContracts.length > 3) {
       selectedContracts = selectedContracts.slice(0, 3);
     }
