@@ -91,14 +91,29 @@ export async function monitorStopLosses(): Promise<StopLossResult> {
       candidates.push(candidate);
       
       if (shouldTrigger) {
-        console.log(`🚨 STOP LOSS TRIGGERED: ${trade.contract.question.substring(0, 50)}...`);
+        console.log(`🚨 STOP LOSS THRESHOLD HIT: ${trade.contract.question.substring(0, 50)}...`);
         console.log(`   Entry: ${(trade.entry_odds * 100).toFixed(1)}% → Current: ${(currentOdds * 100).toFixed(1)}%`);
         console.log(`   Unrealized Loss: $${unrealizedLoss.toFixed(2)} (${unrealizedLossPct.toFixed(1)}%)`);
-        
-        const result = await executeStopLoss(trade, currentOdds, candidate.reason, config);
-        
-        if (result.success && result.event) {
-          triggered.push(result.event);
+        console.log(`   🤖 Consulting AI for decision...`);
+
+        // Let AI research and decide whether to actually sell
+        const aiDecision = await getAIStopLossDecision(trade, currentOdds, candidate);
+
+        console.log(`   AI Decision: ${aiDecision.shouldSell ? '❌ SELL' : '✅ HOLD'}`);
+        console.log(`   Reasoning: ${aiDecision.reasoning.substring(0, 100)}...`);
+
+        // Log the AI decision to database
+        await logStopLossAIDecision(trade.id, aiDecision);
+
+        // Only execute if AI recommends selling
+        if (aiDecision.shouldSell) {
+          const result = await executeStopLoss(trade, currentOdds, aiDecision.reasoning, config);
+
+          if (result.success && result.event) {
+            triggered.push(result.event);
+          }
+        } else {
+          console.log(`   ✅ Holding position based on AI recommendation`);
         }
       }
     } catch (error: any) {
@@ -256,19 +271,138 @@ Total realized loss: $${Math.abs(totalLoss).toFixed(2)}
 
 export async function checkCircuitBreaker(events: StopLossEvent[]): Promise<void> {
   const recentStopLosses = await getRecentStopLosses(24);
-  
+
   if (recentStopLosses.length >= 3) {
     console.log('🔴 CIRCUIT BREAKER: 3+ stop losses in 24 hours');
-    
+
     await supabase
       .from('stop_loss_config')
       .update({ enabled: false })
       .eq('id', 1);
-    
+
     // Log circuit breaker (notifications removed)
     const circuitBreakerMessage = `🔴 CIRCUIT BREAKER ACTIVATED\n\n3+ stop losses triggered in 24 hours.\nTrading has been automatically halted.`;
     console.error('🔴 CIRCUIT BREAKER:', circuitBreakerMessage);
     await sendSMS('admin', circuitBreakerMessage);
+  }
+}
+
+/**
+ * Ask AI to research market conditions and decide whether to execute stop-loss
+ */
+async function getAIStopLossDecision(
+  trade: Trade,
+  currentOdds: number,
+  candidate: StopLossCandidate
+): Promise<{ shouldSell: boolean; reasoning: string; confidence: number }> {
+  const OPENAI_API_URL = 'https://api.openai.com/v1/chat/completions';
+  const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+
+  const prompt = `You are an expert Kalshi trader evaluating whether to execute a stop-loss sell.
+
+POSITION DETAILS:
+- Market: ${trade.contract.question}
+- Side: ${trade.side}
+- Entry Odds: ${(trade.entry_odds * 100).toFixed(1)}%
+- Current Odds: ${(currentOdds * 100).toFixed(1)}%
+- Position Size: $${trade.position_size.toFixed(2)}
+- Contracts: ${trade.contracts_purchased}
+- Unrealized Loss: $${candidate.unrealizedLoss.toFixed(2)} (${candidate.unrealizedLossPct.toFixed(1)}%)
+- Hold Time: ${candidate.holdTimeHours.toFixed(1)} hours
+
+SITUATION:
+The position has dropped ${Math.abs(candidate.unrealizedLossPct).toFixed(1)}% and triggered our stop-loss threshold.
+
+YOUR TASK:
+1. RESEARCH the market: What likely caused this price drop? Is it based on new information, or just temporary volatility?
+2. ANALYZE recovery likelihood: Based on the event type and current market conditions, how likely is this position to recover?
+3. DECIDE: Should we sell now to limit losses, or hold because it's likely to recover?
+
+Consider:
+- Event type (sports, politics, economics, etc.)
+- Time remaining until resolution
+- Magnitude of the drop (is it catastrophic or manageable?)
+- Recent news or developments
+- Whether the underlying thesis has changed
+
+Respond in JSON:
+{
+  "shouldSell": boolean,
+  "confidence": 0-1,
+  "reasoning": "Detailed explanation of research findings and decision rationale"
+}
+
+Be conservative: If the fundamental thesis has changed or recovery is unlikely, recommend selling.`;
+
+  try {
+    const response = await fetch(OPENAI_API_URL, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${OPENAI_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o',
+        max_completion_tokens: 2000,
+        temperature: 0.3, // Lower temperature for more conservative decisions
+        messages: [
+          { role: 'system', content: 'You are an expert Kalshi trader making stop-loss decisions based on research and analysis.' },
+          { role: 'user', content: prompt },
+        ],
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(`OpenAI API error: ${response.status}`);
+    }
+
+    const data: any = await response.json();
+    const text = data?.choices?.[0]?.message?.content || '';
+
+    // Parse JSON response
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      throw new Error('Could not parse AI response');
+    }
+
+    const parsed = JSON.parse(jsonMatch[0]);
+
+    return {
+      shouldSell: parsed.shouldSell ?? true, // Default to selling if unclear
+      confidence: parsed.confidence ?? 0.5,
+      reasoning: parsed.reasoning || 'No reasoning provided',
+    };
+  } catch (error: any) {
+    console.error('❌ AI decision failed:', error.message);
+    // Default to selling if AI fails (conservative approach)
+    return {
+      shouldSell: true,
+      confidence: 0.5,
+      reasoning: `AI decision failed: ${error.message}. Defaulting to sell for safety.`,
+    };
+  }
+}
+
+/**
+ * Log AI stop-loss decision to database
+ */
+async function logStopLossAIDecision(
+  tradeId: string,
+  decision: { shouldSell: boolean; reasoning: string; confidence: number }
+): Promise<void> {
+  try {
+    await supabase
+      .from('stop_loss_ai_decisions')
+      .insert({
+        trade_id: tradeId,
+        should_sell: decision.shouldSell,
+        confidence: decision.confidence,
+        reasoning: decision.reasoning,
+        created_at: new Date().toISOString(),
+      });
+  } catch (error: any) {
+    console.error('Failed to log AI decision:', error.message);
+    // Don't throw - logging shouldn't block execution
   }
 }
 
