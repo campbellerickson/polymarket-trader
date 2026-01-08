@@ -48,15 +48,22 @@ export async function monitorStopLosses(): Promise<StopLossResult> {
   for (const trade of openTrades) {
     try {
       const market = await getMarket(trade.contract.market_id);
+
+      // Skip resolved markets - they should be handled by the resolver, not stop-loss
+      if (market.resolved) {
+        console.log(`   ⏭️ Skipping resolved market: ${trade.contract.question.substring(0, 50)}...`);
+        continue;
+      }
+
       const currentOdds = trade.side === 'YES' ? market.yes_odds : market.no_odds;
-      
+
       const currentValue = trade.contracts_purchased * currentOdds;
       const unrealizedLoss = currentValue - trade.position_size;
       const unrealizedLossPct = (unrealizedLoss / trade.position_size) * 100;
-      
+
       const holdTimeHours = (Date.now() - new Date(trade.executed_at).getTime()) / (1000 * 60 * 60);
-      
-      const shouldTrigger = 
+
+      const shouldTrigger =
         currentOdds < config.triggerThreshold &&
         holdTimeHours >= config.minHoldTimeHours;
       
