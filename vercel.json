@@ -10,11 +10,11 @@
     },
     {
       "path": "/api/cron/stop-loss",
-      "schedule": "0 */2 * * *"
+      "schedule": "*/30 * * * *"
     },
     {
       "path": "/api/cron/check-fills",
-      "schedule": "0 * * * *"
+      "schedule": "*/30 * * * *"
     },
     {
       "path": "/api/cron/check-resolutions",
