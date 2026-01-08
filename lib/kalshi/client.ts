@@ -447,6 +447,24 @@ export async function getAccountBalance(): Promise<number> {
 }
 
 /**
+ * Get current portfolio positions from Kalshi
+ * Returns all active positions (markets where we hold contracts)
+ */
+export async function getPortfolioPositions(): Promise<any[]> {
+  const portfolioApi = getPortfolioApi();
+
+  try {
+    const response = await portfolioApi.getPositions();
+    const positions = (response.data as any).market_positions || [];
+    return positions;
+  } catch (error: any) {
+    const errorMessage = error.response?.data?.error?.message || error.message || 'Unknown error';
+    const statusCode = error.response?.status || 500;
+    throw new Error(`Failed to fetch positions: ${statusCode} ${errorMessage}`);
+  }
+}
+
+/**
  * Place an order on Kalshi
  * Uses the official SDK which handles authentication automatically
  */

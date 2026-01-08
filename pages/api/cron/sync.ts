@@ -1,6 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { monitorStopLosses } from '../../../lib/trading/stop-loss';
-import { getMarket, getOrdersApi } from '../../../lib/kalshi/client';
+import { getMarket, getOrdersApi, getPortfolioPositions } from '../../../lib/kalshi/client';
 import { supabase } from '../../../lib/database/client';
 
 /**
@@ -31,6 +31,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     cleanup: null,
     syncOrders: null,
     syncOutcomes: null,
+    reconcile: null,
   };
 
   try {
@@ -89,6 +90,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       } catch (error: any) {
         console.error('❌ Sync outcomes failed:', error.message);
         results.syncOutcomes = { success: false, error: error.message };
+      }
+
+      console.log('\n🔄 Reconciling database with Kalshi positions...');
+      try {
+        const reconcileResult = await reconcilePositions();
+        results.reconcile = reconcileResult;
+        console.log(`✅ Reconciliation complete: ${reconcileResult.reconciled} trades updated`);
+      } catch (error: any) {
+        console.error('❌ Reconciliation failed:', error.message);
+        results.reconcile = { success: false, error: error.message };
       }
     }
 
@@ -292,4 +303,56 @@ async function syncOutcomesToAI() {
   }
 
   return { success: true, synced };
+}
+
+// ===== RECONCILE DATABASE WITH KALSHI POSITIONS =====
+async function reconcilePositions() {
+  console.log('📊 Fetching actual positions from Kalshi...');
+  const kalshiPositions = await getPortfolioPositions();
+
+  // Get all open trades from database
+  const { data: openTrades, error } = await supabase
+    .from('trades')
+    .select('*, contract:contracts(*)')
+    .eq('status', 'open');
+
+  if (error) throw new Error(`Failed to fetch open trades: ${error.message}`);
+
+  const dbCount = openTrades?.length || 0;
+  const kalshiCount = kalshiPositions.length;
+
+  console.log(`   Database: ${dbCount} open trades`);
+  console.log(`   Kalshi: ${kalshiCount} positions`);
+
+  let reconciled = 0;
+
+  // Build map of Kalshi positions by ticker
+  const kalshiMap = new Map();
+  for (const position of kalshiPositions) {
+    kalshiMap.set(position.ticker, position);
+  }
+
+  // Check each database trade against Kalshi positions
+  for (const trade of openTrades || []) {
+    const kalshiPosition = kalshiMap.get(trade.contract.market_id);
+
+    // If position doesn't exist in Kalshi, mark as cancelled
+    if (!kalshiPosition) {
+      console.log(`   ⚠️ Trade ${trade.id} (${trade.contract.market_id}) not found in Kalshi - marking as cancelled`);
+
+      await supabase
+        .from('trades')
+        .update({
+          status: 'cancelled',
+          exit_odds: null,
+          pnl: 0,
+          resolved_at: new Date().toISOString(),
+        })
+        .eq('id', trade.id);
+
+      reconciled++;
+    }
+  }
+
+  return { success: true, reconciled };
 }
