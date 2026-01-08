@@ -82,52 +82,52 @@ export async function executeTrades(
         contractDbId = newContract.id;
       }
 
-      // 3. Get current orderbook
+      // 3. Get current orderbook for logging
       const orderbook = await getOrderbook(decision.contract.market_id);
 
-      // 4. Calculate contracts to purchase
-      const contracts = calculateContractAmount(
-        decision.allocation,
-        entryOdds
-      );
-
-      // 5. Determine which side to buy (always bet the high-probability side)
+      // 4. Determine which side to buy (always bet the high-probability side)
       // If yes_odds > 50%, buy YES. If yes_odds < 50% (no_odds > 50%), buy NO.
       const side = entryOdds > 0.5 ? 'YES' : 'NO';
 
-      // Use best ask price from orderbook for limit order
-      // This ensures we match with existing offers for immediate fill
-      const price = side === 'YES'
-        ? (orderbook.bestYesAsk || entryOdds)
-        : (orderbook.bestNoAsk || (1 - entryOdds));
-
-      console.log(`   Betting ${side} at ${(price * 100).toFixed(1)}% (fading ${side === 'YES' ? 'NO' : 'YES'} tail risk)`);
-      console.log(`   Using LIMIT order at best ask price (acts like market order)`);
+      console.log(`   Betting ${side} at ~${(entryOdds * 100).toFixed(1)}% (fading ${side === 'YES' ? 'NO' : 'YES'} tail risk)`);
+      console.log(`   Using MARKET order with buy_max_cost (Kalshi best practice)`);
+      console.log(`   Budget: $${decision.allocation.toFixed(2)}`);
       console.log(`   Orderbook: YES ask=${orderbook.bestYesAsk?.toFixed(3)}, NO ask=${orderbook.bestNoAsk?.toFixed(3)}`);
 
-      // 6. Execute limit order at best ask price (immediate fill if liquidity exists)
+      // 5. Execute market order with buy_max_cost
+      // This is the correct way per Kalshi API - it will buy as many contracts as possible
+      // up to the dollar limit, getting the best available prices
       const order = await placeOrder({
         market: decision.contract.market_id,
         side,
-        amount: contracts,
-        price, // Limit price = best ask (should fill immediately if orderbook is correct)
-        type: 'limit', // Limit order for reliable fills
+        amount: decision.allocation, // Dollar amount (not contract count)
+        type: 'market', // Market order with buy_max_cost
       });
+
+      // Get actual contracts purchased from filled order
+      let contractsPurchased = 0;
 
       if (TRADING_CONSTANTS.DRY_RUN) {
         console.log('   🧪 DRY RUN: Trade simulated');
+        // Estimate contracts for dry run
+        contractsPurchased = Math.floor(decision.allocation / entryOdds);
       } else {
         console.log(`   ✅ Order placed: ${order.order_id || 'unknown'}`);
 
-        // Limit orders at best ask should fill quickly if liquidity exists
+        // Market orders should fill quickly
         console.log(`   ⏳ Waiting for order fill...`);
         try {
           const filledOrder = await waitForOrderFill(order.order_id, 30000, 2000); // 30s timeout, 2s polling
-          console.log(`   ✅ Order filled successfully`);
+          // Get actual filled count from order response
+          contractsPurchased = filledOrder.remaining_count !== undefined
+            ? (order.count || 10000) - filledOrder.remaining_count
+            : (filledOrder.filled_count || 0);
+          console.log(`   ✅ Order filled: ${contractsPurchased} contracts purchased`);
         } catch (fillError: any) {
           console.error(`   ⚠️ Order did not fill within 30s: ${fillError.message}`);
           console.error(`   ⚠️ Order may be resting in orderbook - will be tracked for later fill`);
-          // Don't fail the trade - order is placed and may fill later
+          // Estimate contracts for now (will be updated by sync-orders cron)
+          contractsPurchased = Math.floor(decision.allocation / entryOdds);
         }
       }
 
@@ -137,7 +137,7 @@ export async function executeTrades(
         entry_odds: entryOdds,
         position_size: decision.allocation,
         side, // Use dynamic side (YES if >50%, NO if <50%)
-        contracts_purchased: contracts,
+        contracts_purchased: contractsPurchased,
         ai_confidence: decision.confidence,
         ai_reasoning: decision.reasoning,
         risk_factors: decision.riskFactors && decision.riskFactors.length > 0

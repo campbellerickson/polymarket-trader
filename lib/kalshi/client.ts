@@ -453,8 +453,8 @@ export async function getAccountBalance(): Promise<number> {
 export async function placeOrder(order: {
   market: string;
   side: 'YES' | 'NO' | 'SELL_YES' | 'SELL_NO';
-  amount: number;
-  price: number;
+  amount: number; // Dollar amount to spend (for market orders) OR number of contracts (for limit orders)
+  price?: number; // Optional: for limit orders only
   type?: 'limit' | 'market'; // Optional: default to market for immediate fills
 }): Promise<any> {
   if (process.env.DRY_RUN === 'true') {
@@ -468,29 +468,39 @@ export async function placeOrder(order: {
   const side = order.side === 'YES' || order.side === 'SELL_YES' ? 'yes' : 'no';
   const action = order.side.startsWith('SELL') ? 'sell' : 'buy';
 
-  // Kalshi uses price in cents (0-100), count in contracts
-  // Price should be integer between 1-99 (cents)
-  const orderPrice = Math.max(1, Math.min(99, Math.floor(order.price * 100)));
-
   // Use market orders by default for immediate fills
   const orderType = order.type || 'market';
 
   // OrdersApi.createOrder takes a CreateOrderRequest object
-  // Declare outside try block so it's accessible in catch block
   const orderRequest: any = {
     ticker: order.market,
     side: side as 'yes' | 'no',
     action: action as 'buy' | 'sell',
-    count: Math.floor(order.amount), // Number of contracts
-    type: orderType, // 'market' for immediate fills, 'limit' for price control
+    type: orderType,
+    client_order_id: `order-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
   };
 
-  // IMPORTANT: Kalshi requires price parameter even for market orders!
-  // Set price based on side (yes_price for yes side, no_price for no side)
-  if (side === 'yes') {
-    orderRequest.yes_price = orderPrice; // Price in cents (1-99)
+  if (orderType === 'market') {
+    // MARKET ORDERS: Use buy_max_cost to control spending
+    // Set high count and let buy_max_cost limit actual spending
+    orderRequest.count = 10000; // High number to allow buying up to budget
+    orderRequest.buy_max_cost = Math.floor(order.amount * 100); // Dollar amount in cents
+    console.log(`   📤 Market order: max ${orderRequest.count} contracts, budget $${order.amount} (${orderRequest.buy_max_cost} cents)`);
   } else {
-    orderRequest.no_price = orderPrice; // Price in cents (1-99)
+    // LIMIT ORDERS: Use exact price and count
+    if (!order.price) {
+      throw new Error('Limit orders require a price parameter');
+    }
+    const orderPrice = Math.max(1, Math.min(99, Math.floor(order.price * 100)));
+    orderRequest.count = Math.floor(order.amount); // Exact number of contracts
+
+    // Set price based on side
+    if (side === 'yes') {
+      orderRequest.yes_price = orderPrice;
+    } else {
+      orderRequest.no_price = orderPrice;
+    }
+    console.log(`   📤 Limit order: ${orderRequest.count} contracts at ${orderPrice} cents`);
   }
 
   try {
