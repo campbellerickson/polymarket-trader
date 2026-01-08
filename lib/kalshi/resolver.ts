@@ -55,12 +55,12 @@ export async function checkAndResolveOpenTrades(): Promise<{ resolvedCount: numb
   // After resolving trades, check if we should trigger a new trade
   console.log(`\n💰 Checking available cash after resolutions...`);
   const availableCash = await getAccountBalance();
-  const shouldTriggerTrade = availableCash > 20;
+  const shouldTriggerTrade = availableCash > 0;
 
   if (shouldTriggerTrade) {
-    console.log(`   ✅ Available cash: $${availableCash.toFixed(2)} > $20 - Will trigger new trade`);
+    console.log(`   ✅ Available cash: $${availableCash.toFixed(2)} > $0 - Will trigger new trade`);
   } else {
-    console.log(`   ⏸️ Available cash: $${availableCash.toFixed(2)} <= $20 - No new trade needed`);
+    console.log(`   ⏸️ Available cash: $${availableCash.toFixed(2)} = $0 - No new trade needed`);
   }
 
   return {

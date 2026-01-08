@@ -129,11 +129,12 @@ Return JSON in this format:
 Guidelines:
 - SELECT 1-3 of the BEST contracts presented (your job is to pick winners, not pass on everything)
 - RESEARCH each contract - understand the actual event, not just the numbers
-- Daily budget: $${request.dailyBudget} - allocate most/all to your top picks
-- Position sizing: $20-50 per contract based on quality ranking
-  * Best opportunity: $40-50
-  * Good opportunity: $30-40
-  * Acceptable opportunity: $20-30
+- Daily budget: $${request.dailyBudget} - use what makes sense, prefer smaller distributed positions
+- Position sizing: $20-50 per contract (KEEP SIZES SMALL - prefer $25-35)
+  * Best opportunity: $30-50 (rarely use $50, prefer $30-40)
+  * Good opportunity: $25-35
+  * Acceptable opportunity: $20-25
+  * Default: $25-30 per contract
 - COMPARE contracts - which have best combination of edge, timing, lower risk?
 - EXIT TIMING - consider opportunities to exit early if odds move 2-3% in our favor
 - Some risk is OK and expected - focus on finding the BEST risk/reward available

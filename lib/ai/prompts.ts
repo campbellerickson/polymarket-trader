@@ -93,13 +93,14 @@ ANALYSIS FRAMEWORK:
    CRITICAL: If a contract type consistently lost money, AVOID similar contracts.
    CRITICAL: If a contract type consistently won, FAVOR similar contracts.
 
-6. POSITION SIZING (COMPARATIVE ALLOCATION)
-   Allocate based on RELATIVE quality:
-   - Best opportunity: $40-50
-   - Good opportunity: $30-40
-   - Acceptable opportunity: $20-30
-   - Suggested range: $20-50 per contract based on quality
-   - You SHOULD allocate most/all of your daily budget to the best opportunities
+6. POSITION SIZING (CONSERVATIVE ALLOCATION)
+   Allocate based on RELATIVE quality - KEEP SIZES SMALL:
+   - Best opportunity: $30-50 (rarely use $50, prefer $30-40)
+   - Good opportunity: $25-35
+   - Acceptable opportunity: $20-25
+   - Default allocation: $25-30 per contract
+   - Maximum allowed: $50 (but avoid using max unless exceptional conviction)
+   - Prefer smaller, more distributed positions across multiple opportunities
    - Diversify across uncorrelated events when possible
 
 RESPONSE FORMAT (JSON):
