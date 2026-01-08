@@ -18,7 +18,7 @@
     },
     {
       "path": "/api/cron/check-resolutions",
-      "schedule": "*/30 * * * *"
+      "schedule": "0 * * * *"
     },
     {
       "path": "/api/cron/screen-markets",

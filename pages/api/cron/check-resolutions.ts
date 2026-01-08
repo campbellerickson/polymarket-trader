@@ -20,7 +20,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const { getCurrentBankroll } = await import('../../../lib/database/queries');
       const { TRADING_CONSTANTS } = await import('../../../config/constants');
 
-      // 1. Scan for contracts
+      // 1. First, run screen-markets to refresh the market cache
+      console.log('📊 Refreshing market cache...');
+      try {
+        const { screenAndCacheMarkets } = await import('../../../lib/kalshi/market-screener');
+        await screenAndCacheMarkets();
+        console.log('✅ Market cache refreshed');
+      } catch (screenError: any) {
+        console.error('⚠️ Failed to refresh market cache:', screenError.message);
+        // Continue anyway - we might have stale cache
+      }
+
+      // 2. Scan for contracts
       const contracts = await scanContracts({
         minOdds: TRADING_CONSTANTS.MIN_ODDS,
         maxOdds: TRADING_CONSTANTS.MAX_ODDS,
@@ -41,7 +52,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         });
       }
 
-      // 2. Get AI analysis (use available cash as budget)
+      // 3. Get AI analysis (use available cash as budget)
       const analysis = await analyzeContracts({
         contracts,
         historicalPerformance: [],
@@ -51,7 +62,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       console.log(`🤖 AI selected ${analysis.selectedContracts.length} contracts for reinvestment`);
 
-      // 3. Execute trades if AI selected any
+      // 4. Execute trades if AI selected any
       if (analysis.selectedContracts.length > 0) {
         const tradeResults = await executeTrades(analysis);
         console.log(`✅ Executed ${tradeResults.filter(r => r.success).length}/${tradeResults.length} reinvestment trades`);
