@@ -118,25 +118,30 @@ async function executeStopLoss(
 ): Promise<{ success: boolean; event?: StopLossEvent; error?: string }> {
   try {
     const orderbook = await getOrderbook(trade.contract.market_id);
-    
+
     const bestBid = trade.side === 'YES' ? orderbook.bestYesBid : orderbook.bestNoBid;
     const slippage = Math.abs(bestBid - currentOdds) / currentOdds;
-    
+
     if (slippage > config.maxSlippagePct) {
       console.log(`⚠️ Slippage too high (${(slippage * 100).toFixed(2)}%), skipping`);
-      return { 
-        success: false, 
+      return {
+        success: false,
         error: `Slippage ${(slippage * 100).toFixed(2)}% exceeds max ${(config.maxSlippagePct * 100).toFixed(2)}%`
       };
     }
-    
+
+    // Sell using same logic as buying: specify side to sell, action=sell, count=number of contracts
+    // Note: amount parameter is dollar amount for buys, but for sells we want to sell ALL contracts
+    console.log(`   Selling ${trade.contracts_purchased} ${trade.side} contracts @ ${(bestBid * 100).toFixed(1)}%`);
+
     const order = await placeOrder({
       market: trade.contract.market_id,
       side: trade.side === 'YES' ? 'SELL_YES' : 'SELL_NO',
-      amount: trade.contracts_purchased,
-      price: bestBid
+      amount: trade.contracts_purchased * bestBid, // Dollar value of position (for consistent interface)
+      price: bestBid, // Current market price for the side we're selling
+      type: 'market'
     });
-    
+
     const proceeds = trade.contracts_purchased * bestBid;
     const realizedLoss = proceeds - trade.position_size;
     
