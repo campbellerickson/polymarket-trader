@@ -130,15 +130,15 @@ async function executeStopLoss(
       };
     }
 
-    // Sell using same logic as buying: specify side to sell, action=sell, count=number of contracts
-    // Note: amount parameter is dollar amount for buys, but for sells we want to sell ALL contracts
+    // Sell ALL contracts we own at current market price
     console.log(`   Selling ${trade.contracts_purchased} ${trade.side} contracts @ ${(bestBid * 100).toFixed(1)}%`);
 
     const order = await placeOrder({
       market: trade.contract.market_id,
       side: trade.side === 'YES' ? 'SELL_YES' : 'SELL_NO',
-      amount: trade.contracts_purchased * bestBid, // Dollar value of position (for consistent interface)
-      price: bestBid, // Current market price for the side we're selling
+      amount: 0, // Not used when count is specified
+      price: Math.max(0.01, bestBid), // Ensure price is at least 1 cent (Kalshi minimum)
+      count: trade.contracts_purchased, // Explicit count: sell all contracts
       type: 'market'
     });
 

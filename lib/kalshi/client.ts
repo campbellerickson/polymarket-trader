@@ -453,9 +453,10 @@ export async function getAccountBalance(): Promise<number> {
 export async function placeOrder(order: {
   market: string;
   side: 'YES' | 'NO' | 'SELL_YES' | 'SELL_NO';
-  amount: number; // Dollar amount to spend (for market orders) OR number of contracts (for limit orders)
+  amount: number; // Dollar amount to spend (for buys) OR number of contracts (if count specified)
   price?: number; // Optional: for limit orders only
   type?: 'limit' | 'market'; // Optional: default to market for immediate fills
+  count?: number; // Optional: explicit contract count (for sells)
 }): Promise<any> {
   if (process.env.DRY_RUN === 'true') {
     console.log('🧪 DRY RUN: Would place order:', order);
@@ -466,10 +467,18 @@ export async function placeOrder(order: {
   const side = order.side === 'YES' || order.side === 'SELL_YES' ? 'yes' : 'no';
   const action = order.side.startsWith('SELL') ? 'sell' : 'buy';
 
-  // Calculate number of contracts to buy based on dollar amount and estimated price
-  // Use current odds as best estimate of execution price
+  // Calculate number of contracts
+  let contracts: number;
+  if (order.count !== undefined) {
+    // Explicit count provided (e.g., for sells)
+    contracts = order.count;
+  } else {
+    // Calculate from dollar amount and price (for buys)
+    const pricePerContract = order.price || 0.5;
+    contracts = Math.floor(order.amount / pricePerContract);
+  }
+
   const pricePerContract = order.price || 0.5;
-  const contracts = Math.floor(order.amount / pricePerContract);
 
   // Build order request with count and let Kalshi execute at market price
   // Note: Kalshi REQUIRES a price field, so we pass current market price
