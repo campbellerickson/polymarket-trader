@@ -86,11 +86,13 @@ export async function executeTrades(
       const orderbook = await getOrderbook(decision.contract.market_id);
 
       // 4. Determine which side to buy (always bet the high-probability side)
-      // If yes_odds > 50%, buy YES. If yes_odds < 50% (no_odds > 50%), buy NO.
+      // Strategy: Fade overpriced tail risk by buying the >50% side
+      // If yes_odds = 90%, buy YES (fade NO tail risk at 10%)
+      // If yes_odds = 30%, buy NO (fade YES tail risk at 30%, since NO is at 70%)
       const side = entryOdds > 0.5 ? 'YES' : 'NO';
 
       console.log(`   Betting ${side} at ~${(entryOdds * 100).toFixed(1)}% (fading ${side === 'YES' ? 'NO' : 'YES'} tail risk)`);
-      console.log(`   Using MARKET order with buy_max_cost (Kalshi best practice)`);
+      console.log(`   Using market order (Kalshi will execute at best available price)`);
       console.log(`   Budget: $${decision.allocation.toFixed(2)}`);
       console.log(`   Orderbook: YES ask=${orderbook.bestYesAsk?.toFixed(3)}, NO ask=${orderbook.bestNoAsk?.toFixed(3)}`);
 

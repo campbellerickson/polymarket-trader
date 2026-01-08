@@ -466,17 +466,12 @@ export async function placeOrder(order: {
   const side = order.side === 'YES' || order.side === 'SELL_YES' ? 'yes' : 'no';
   const action = order.side.startsWith('SELL') ? 'sell' : 'buy';
 
-  // Use market orders by default for immediate fills
-  const orderType = order.type || 'market';
-
-  // Calculate number of contracts to buy based on dollar amount and odds
-  const pricePerContract = order.price || 0.5; // Use provided price or estimate 50 cents
+  // Calculate number of contracts to buy based on dollar amount and estimated price
+  // Use current odds as best estimate of execution price
+  const pricePerContract = order.price || 0.5;
   const contracts = Math.floor(order.amount / pricePerContract);
 
-  // Convert price to cents (Kalshi uses 1-99 cents)
-  const priceCents = Math.max(1, Math.min(99, Math.floor(pricePerContract * 100)));
-
-  // Build order request - Kalshi requires yes_price or no_price
+  // Build order request - send ONLY ticker, side, action, count (no price)
   const orderRequest: any = {
     ticker: order.market,
     side: side,
@@ -484,14 +479,7 @@ export async function placeOrder(order: {
     count: contracts,
   };
 
-  // Add price based on side (required by Kalshi)
-  if (side === 'yes') {
-    orderRequest.yes_price = priceCents;
-  } else {
-    orderRequest.no_price = priceCents;
-  }
-
-  console.log(`   📤 Order: ${contracts} ${side} contracts @ ${priceCents}¢ on ${order.market}`);
+  console.log(`   📤 Order: ${contracts} ${side} contracts (${action}) on ${order.market}`);
 
   try {
     console.log('   📤 Sending order request:', JSON.stringify(orderRequest, null, 2));
