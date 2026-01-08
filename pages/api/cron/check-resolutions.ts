@@ -23,9 +23,23 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       // 1. First, run screen-markets to refresh the market cache
       console.log('📊 Refreshing market cache...');
       try {
-        const { screenAndCacheMarkets } = await import('../../../lib/kalshi/market-screener');
-        await screenAndCacheMarkets();
-        console.log('✅ Market cache refreshed');
+        const { KalshiMarketScreener } = await import('../../../lib/kalshi/screener');
+        const { cacheMarkets } = await import('../../../lib/kalshi/cache');
+
+        const screener = new KalshiMarketScreener();
+        const screenedMarkets = await screener.screenMarkets({
+          minVolume24h: 2000,
+          minOpenInterest: 2000,
+          orderSize: 100,
+          topNForDepthCheck: 15,
+          minOdds: TRADING_CONSTANTS.MIN_ODDS,
+          maxDaysToResolution: TRADING_CONSTANTS.MAX_DAYS_TO_RESOLUTION,
+        });
+
+        if (screenedMarkets.length > 0) {
+          await cacheMarkets(screenedMarkets);
+        }
+        console.log(`✅ Market cache refreshed with ${screenedMarkets.length} markets`);
       } catch (screenError: any) {
         console.error('⚠️ Failed to refresh market cache:', screenError.message);
         // Continue anyway - we might have stale cache
