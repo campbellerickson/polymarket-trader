@@ -141,11 +141,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       current_bankroll: await getCurrentBankroll(),
     });
     
+    // Sanitize results to avoid circular references
+    const sanitizedResults = results.map(r => ({
+      success: r.success,
+      error: r.error,
+      trade_id: r.trade?.id,
+      market_id: r.contract?.market_id || r.trade?.contract?.market_id,
+    }));
+
     return res.status(200).json({
       success: true,
       contracts_analyzed: contracts.length,
-      trades_executed: results.length,
-      results
+      trades_executed: results.filter(r => r.success).length,
+      results: sanitizedResults
     });
     
   } catch (error: any) {
