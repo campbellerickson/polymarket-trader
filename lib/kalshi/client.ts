@@ -511,13 +511,19 @@ export async function placeOrder(order: {
     return (response.data as any).order || response.data;
   } catch (error: any) {
     console.error('   ❌ Order request failed:', JSON.stringify(orderRequest, null, 2));
-    console.error('   ❌ Error response (full):', JSON.stringify(error.response, null, 2));
-    console.error('   ❌ Error data:', JSON.stringify(error.response?.data, null, 2));
     console.error('   ❌ Error message:', error.message);
-    console.error('   ❌ Error details:', error.response?.data?.error);
-    const errorMessage = error.response?.data?.error || error.response?.data || error.message || 'Unknown error';
+
+    // Safely extract error details without circular references
+    const errorData = error.response?.data;
     const statusCode = error.response?.status || 500;
-    throw new Error(`Failed to place order: ${statusCode} ${JSON.stringify(errorMessage)}`);
+
+    if (errorData) {
+      console.error('   ❌ Error data:', typeof errorData === 'object' ? JSON.stringify(errorData, null, 2) : errorData);
+    }
+
+    // Create clean error message
+    const errorMessage = errorData?.error || errorData?.message || error.message || 'Unknown error';
+    throw new Error(`Failed to place order: ${statusCode} ${errorMessage}`);
   }
 }
 
