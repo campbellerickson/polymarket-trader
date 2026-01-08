@@ -57,6 +57,12 @@ export async function monitorStopLosses(): Promise<StopLossResult> {
 
       const currentOdds = trade.side === 'YES' ? market.yes_odds : market.no_odds;
 
+      // Skip if current value is 0% - indicates market has resolved/closed trading
+      if (currentOdds === 0) {
+        console.log(`   ⏭️ Skipping market at 0% (resolved/closed): ${trade.contract.question.substring(0, 50)}...`);
+        continue;
+      }
+
       const currentValue = trade.contracts_purchased * currentOdds;
       const unrealizedLoss = currentValue - trade.position_size;
       const unrealizedLossPct = (unrealizedLoss / trade.position_size) * 100;
