@@ -9,6 +9,7 @@ import { supabase } from '../../../lib/database/client';
  * Every run (15 min):
  * - Stop-loss monitoring
  * - Check order fills
+ * - Reconcile database positions with Kalshi
  *
  * Once per day (3 AM only):
  * - Cleanup resolved trades
@@ -60,6 +61,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       results.checkFills = { success: false, error: error.message };
     }
 
+    // ===== EVERY RUN: Reconcile Database with Kalshi Positions =====
+    console.log('\n🔄 Reconciling database with Kalshi positions...');
+    try {
+      const reconcileResult = await reconcilePositions();
+      results.reconcile = reconcileResult;
+      console.log(`✅ Reconciliation complete: ${reconcileResult.reconciled} trades updated`);
+    } catch (error: any) {
+      console.error('❌ Reconciliation failed:', error.message);
+      results.reconcile = { success: false, error: error.message };
+    }
+
     // ===== DAILY ONLY: Cleanup Resolved Trades =====
     if (isDailyRun) {
       console.log('\n🧹 Running daily cleanup...');
@@ -90,16 +102,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       } catch (error: any) {
         console.error('❌ Sync outcomes failed:', error.message);
         results.syncOutcomes = { success: false, error: error.message };
-      }
-
-      console.log('\n🔄 Reconciling database with Kalshi positions...');
-      try {
-        const reconcileResult = await reconcilePositions();
-        results.reconcile = reconcileResult;
-        console.log(`✅ Reconciliation complete: ${reconcileResult.reconciled} trades updated`);
-      } catch (error: any) {
-        console.error('❌ Reconciliation failed:', error.message);
-        results.reconcile = { success: false, error: error.message };
       }
     }
 
