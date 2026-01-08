@@ -50,15 +50,23 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     
     // 2. Build historical context for AI
     const historicalPerformance = await getRecentTrades(50);
-    
+
+    // 2.5. Get available cash from Kalshi (use actual balance, not DAILY_BUDGET constant)
+    const availableCash = await getAccountBalance();
+    console.log(`💵 Available cash: $${availableCash.toFixed(2)}`);
+
+    // Use the MINIMUM of daily budget or available cash
+    const effectiveDailyBudget = Math.min(TRADING_CONSTANTS.DAILY_BUDGET, availableCash);
+    console.log(`💰 Effective daily budget: $${effectiveDailyBudget.toFixed(2)} (${effectiveDailyBudget < TRADING_CONSTANTS.DAILY_BUDGET ? 'limited by cash' : 'full budget'})`);
+
     // 3. Get AI analysis
     const analysis = await analyzeContracts({
       contracts,
       historicalPerformance,
       currentBankroll: await getCurrentBankroll(),
-      dailyBudget: TRADING_CONSTANTS.DAILY_BUDGET,
+      dailyBudget: effectiveDailyBudget, // Use effective budget (capped by available cash)
     });
-    
+
     console.log(`🤖 AI selected ${analysis.selectedContracts.length} contracts`);
     console.log(`💰 Total allocation: $${analysis.totalAllocated}`);
 
@@ -82,12 +90,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         // Mark this as a forced trade scenario
         analysis.selectedContracts = topContracts.map(contract => ({
           contract,
-          allocation: TRADING_CONSTANTS.DAILY_BUDGET, // Use full daily budget for the one trade
+          allocation: effectiveDailyBudget, // Use effective budget (respects available cash)
           confidence: 0.75,
           reasoning: 'FORCED: Minimum 1 successful trade per day requirement',
           riskFactors: ['Forced trade - must execute at least 1 trade per day'],
         }));
-        analysis.totalAllocated = TRADING_CONSTANTS.DAILY_BUDGET;
+        analysis.totalAllocated = effectiveDailyBudget;
         analysis.forcedTrade = true; // Flag to tell executor to stop after first success
 
         console.log(`   Will attempt up to ${topContracts.length} contracts (stops after first success):`);
