@@ -138,7 +138,6 @@ async function checkOrderFills() {
   }
 
   const ordersApi = getOrdersApi();
-  const sixHoursAgo = new Date(Date.now() - 6 * 60 * 60 * 1000);
   let filled = 0, cancelled = 0, still_open = 0;
 
   for (const trade of openTrades) {
@@ -192,17 +191,8 @@ async function checkOrderFills() {
         continue;
       }
 
-      const executedAt = new Date(trade.executed_at);
-      if (executedAt < sixHoursAgo && order.status === 'resting') {
-        await ordersApi.cancelOrder(order.order_id);
-        await supabase
-          .from('trades')
-          .update({ status: 'cancelled', exit_odds: null, pnl: 0, resolved_at: new Date().toISOString() })
-          .eq('id', trade.id);
-        cancelled++;
-      } else {
-        still_open++;
-      }
+      // Just track status - cancellation is handled by trader job
+      still_open++;
     } catch (error: any) {
       console.error(`Error checking trade ${trade.id}:`, error.message);
       continue;

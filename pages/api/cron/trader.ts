@@ -7,7 +7,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    // Check balance first - no point in doing anything if we can't trade
+    // STEP 1: Cancel stale orders first (>1 hour old) to free up cash
+    console.log('🧹 Canceling stale orders...');
+    const cancelledCount = await cancelStaleOrders();
+    console.log(`   Cancelled ${cancelledCount} stale orders`);
+
+    // STEP 2: Check balance (after cancelling to get accurate available cash)
     const { getAccountBalance } = await import('../../../lib/kalshi/client');
     const liveBalance = await getAccountBalance();
     console.log(`💵 Live balance: $${liveBalance.toFixed(2)}`);
@@ -19,6 +24,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         success: true,
         resolvedCount: 0,
         availableCash: liveBalance,
+        cancelledOrders: cancelledCount,
         reinvestment: { attempted: false, reason: 'insufficient_funds' }
       });
     }
@@ -115,6 +121,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       success: true,
       resolvedCount: result.resolvedCount,
       availableCash: result.availableCash,
+      cancelledOrders: cancelledCount,
       reinvestment: { attempted: false }
     });
   } catch (error: any) {
@@ -123,5 +130,71 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     await logCronError('check-resolutions', error);
     return res.status(500).json({ error: error.message });
   }
+}
+
+/**
+ * Cancel stale orders (>1 hour old) to free up cash
+ * Orders that don't fill within 1 hour are unlikely to fill at all
+ */
+async function cancelStaleOrders(): Promise<number> {
+  const { supabase } = await import('../../../lib/database/client');
+  const { getOrdersApi } = await import('../../../lib/kalshi/client');
+
+  const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+
+  // Get all open trades older than 1 hour
+  const { data: openTrades, error } = await supabase
+    .from('trades')
+    .select('*, contract:contracts(*)')
+    .eq('status', 'open')
+    .lt('executed_at', oneHourAgo.toISOString());
+
+  if (error || !openTrades || openTrades.length === 0) {
+    return 0;
+  }
+
+  const ordersApi = getOrdersApi();
+  let cancelled = 0;
+
+  for (const trade of openTrades) {
+    try {
+      // Get all orders from Kalshi
+      const { data: allOrders } = await ordersApi.getOrders();
+      const orders = (allOrders as any).orders || [];
+
+      // Find this trade's order (matched by ticker and created time)
+      const order = orders.find((o: any) =>
+        o.ticker === trade.contract?.market_id &&
+        new Date(o.created_time) >= new Date(trade.executed_at) &&
+        new Date(o.created_time) <= new Date(new Date(trade.executed_at).getTime() + 60000)
+      );
+
+      if (!order) continue;
+
+      // If order is still resting (not filled), cancel it
+      if (order.status === 'resting') {
+        console.log(`   Canceling stale order for ${trade.contract.question.substring(0, 40)}...`);
+        await ordersApi.cancelOrder(order.order_id);
+
+        // Mark trade as cancelled in database
+        await supabase
+          .from('trades')
+          .update({
+            status: 'cancelled',
+            exit_odds: null,
+            pnl: 0,
+            resolved_at: new Date().toISOString(),
+          })
+          .eq('id', trade.id);
+
+        cancelled++;
+      }
+    } catch (error: any) {
+      console.error(`   ⚠️ Error canceling order for trade ${trade.id}:`, error.message);
+      continue;
+    }
+  }
+
+  return cancelled;
 }
 
