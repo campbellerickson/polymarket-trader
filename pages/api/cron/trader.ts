@@ -7,8 +7,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    // STEP 1: Cancel stale orders first (>1 hour old) to free up cash
-    console.log('🧹 Canceling stale orders...');
+    // STEP 1: Cancel stale orders first (>50 minutes old) to free up cash
+    console.log('🧹 Canceling stale orders (>50 min)...');
     const cancelledCount = await cancelStaleOrders();
     console.log(`   Cancelled ${cancelledCount} stale orders`);
 
@@ -133,21 +133,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 }
 
 /**
- * Cancel stale orders (>1 hour old) to free up cash
- * Orders that don't fill within 1 hour are unlikely to fill at all
+ * Cancel stale orders (>50 minutes old) to free up cash
+ * Orders that don't fill within 50 minutes are unlikely to fill at all
  */
 async function cancelStaleOrders(): Promise<number> {
   const { supabase } = await import('../../../lib/database/client');
   const { getOrdersApi } = await import('../../../lib/kalshi/client');
 
-  const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+  const fiftyMinutesAgo = new Date(Date.now() - 50 * 60 * 1000);
 
-  // Get all open trades older than 1 hour
+  // Get all open trades older than 50 minutes
   const { data: openTrades, error } = await supabase
     .from('trades')
     .select('*, contract:contracts(*)')
     .eq('status', 'open')
-    .lt('executed_at', oneHourAgo.toISOString());
+    .lt('executed_at', fiftyMinutesAgo.toISOString());
 
   if (error || !openTrades || openTrades.length === 0) {
     return 0;
