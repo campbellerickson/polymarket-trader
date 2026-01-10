@@ -72,6 +72,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       results.reconcile = { success: false, error: error.message };
     }
 
+    // ===== EVERY RUN: Sync Outcomes to AI =====
+    console.log('\n🎯 Syncing outcomes to ai_decisions...');
+    try {
+      const syncOutcomesResult = await syncOutcomesToAI();
+      results.syncOutcomes = syncOutcomesResult;
+      console.log(`✅ Sync outcomes complete: ${syncOutcomesResult.synced} synced`);
+    } catch (error: any) {
+      console.error('❌ Sync outcomes failed:', error.message);
+      results.syncOutcomes = { success: false, error: error.message };
+    }
+
     // ===== DAILY ONLY: Cleanup Resolved Trades =====
     if (isDailyRun) {
       console.log('\n🧹 Running daily cleanup...');
@@ -92,16 +103,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       } catch (error: any) {
         console.error('❌ Sync orders failed:', error.message);
         results.syncOrders = { success: false, error: error.message };
-      }
-
-      console.log('\n🎯 Syncing outcomes to ai_decisions...');
-      try {
-        const syncOutcomesResult = await syncOutcomesToAI();
-        results.syncOutcomes = syncOutcomesResult;
-        console.log(`✅ Sync outcomes complete: ${syncOutcomesResult.synced} synced`);
-      } catch (error: any) {
-        console.error('❌ Sync outcomes failed:', error.message);
-        results.syncOutcomes = { success: false, error: error.message };
       }
     }
 
@@ -260,7 +261,7 @@ async function syncOutcomesToAI() {
 
   const { data: decisions, error } = await supabase
     .from('ai_decisions')
-    .select('id, contract_snapshot')
+    .select('id, contract_snapshot, side, allocated_amount')
     .is('outcome', null)
     .gte('created_at', thirtyDaysAgo.toISOString())
     .limit(100);
@@ -277,10 +278,23 @@ async function syncOutcomesToAI() {
       const market = await getMarket(marketId);
 
       if (market.resolved && market.outcome) {
+        // Determine if AI prediction was correct
+        // If AI bet YES and market resolved YES → won
+        // If AI bet YES and market resolved NO → lost
+        // If AI bet NO and market resolved NO → won
+        // If AI bet NO and market resolved YES → lost
+        const aiSide = decision.side || 'YES'; // Default to YES if not specified
+        const marketOutcome = market.outcome; // 'yes' or 'no' from Kalshi
+
+        const wasCorrect = (
+          (aiSide === 'YES' && marketOutcome.toLowerCase() === 'yes') ||
+          (aiSide === 'NO' && marketOutcome.toLowerCase() === 'no')
+        );
+
         await supabase
           .from('ai_decisions')
           .update({
-            outcome: market.outcome,
+            outcome: wasCorrect ? 'won' : 'lost',
             resolution_source: 'sync-job',
             resolved_at: market.resolved_at || new Date().toISOString(),
           })
