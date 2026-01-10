@@ -261,8 +261,9 @@ async function syncOutcomesToAI() {
 
   const { data: decisions, error } = await supabase
     .from('ai_decisions')
-    .select('id, contract_snapshot, side, allocated_amount')
+    .select('id, contract_snapshot, allocated_amount, trade_id, trade:trades(side)')
     .is('outcome', null)
+    .not('trade_id', 'is', null) // Only get decisions with actual trades
     .gte('created_at', thirtyDaysAgo.toISOString())
     .limit(100);
 
@@ -283,7 +284,9 @@ async function syncOutcomesToAI() {
         // If AI bet YES and market resolved NO → lost
         // If AI bet NO and market resolved NO → won
         // If AI bet NO and market resolved YES → lost
-        const aiSide = decision.side || 'YES'; // Default to YES if not specified
+        const aiSide = (decision.trade as any)?.side; // Get side from joined trade
+        if (!aiSide) continue; // Skip if no side found
+
         const marketOutcome = market.outcome; // 'yes' or 'no' from Kalshi
 
         const wasCorrect = (
