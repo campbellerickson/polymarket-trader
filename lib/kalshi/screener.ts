@@ -164,8 +164,11 @@ export class KalshiMarketScreener {
         const markets = response.data.markets || [];
         allMarkets.push(...markets);
         cursor = response.data.cursor || null;
-        
-        console.log(`   📄 Page ${pageCount}: Fetched ${markets.length} markets (total: ${allMarkets.length})`);
+
+        // Only log every 50 pages to reduce noise
+        if (pageCount % 50 === 0) {
+          console.log(`   Progress: ${allMarkets.length} markets loaded...`);
+        }
         
         // Rate limit: wait 500ms between pages
         if (cursor && markets.length > 0) {

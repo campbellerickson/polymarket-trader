@@ -199,61 +199,65 @@ async function cancelStaleOrders(): Promise<number> {
   const { supabase } = await import('../../../lib/database/client');
   const { getOrdersApi } = await import('../../../lib/kalshi/client');
 
-  const fiftyMinutesAgo = new Date(Date.now() - 50 * 60 * 1000);
+  const fiftyMinutesAgo = Date.now() - (50 * 60 * 1000);
 
-  // Get all open trades older than 50 minutes
-  const { data: openTrades, error } = await supabase
-    .from('trades')
-    .select('*, contract:contracts(*)')
-    .eq('status', 'open')
-    .lt('executed_at', fiftyMinutesAgo.toISOString());
+  try {
+    const ordersApi = getOrdersApi();
 
-  if (error || !openTrades || openTrades.length === 0) {
-    return 0;
-  }
+    // Get ALL orders from Kalshi (including resting ones)
+    const { data: allOrders } = await ordersApi.getOrders();
+    const orders = (allOrders as any).orders || [];
 
-  const ordersApi = getOrdersApi();
-  let cancelled = 0;
+    // Filter for resting orders that are >50 minutes old
+    const staleOrders = orders.filter((o: any) => {
+      if (o.status !== 'resting') return false;
+      const createdTime = new Date(o.created_time).getTime();
+      return (Date.now() - createdTime) > (50 * 60 * 1000);
+    });
 
-  for (const trade of openTrades) {
-    try {
-      // Get all orders from Kalshi
-      const { data: allOrders } = await ordersApi.getOrders();
-      const orders = (allOrders as any).orders || [];
+    if (staleOrders.length === 0) {
+      return 0;
+    }
 
-      // Find this trade's order (matched by ticker and created time)
-      const order = orders.find((o: any) =>
-        o.ticker === trade.contract?.market_id &&
-        new Date(o.created_time) >= new Date(trade.executed_at) &&
-        new Date(o.created_time) <= new Date(new Date(trade.executed_at).getTime() + 60000)
-      );
+    console.log(`   Found ${staleOrders.length} stale orders to cancel`);
+    let cancelled = 0;
 
-      if (!order) continue;
-
-      // If order is still resting (not filled), cancel it
-      if (order.status === 'resting') {
-        console.log(`   Canceling stale order for ${trade.contract.question.substring(0, 40)}...`);
+    for (const order of staleOrders) {
+      try {
+        console.log(`   Canceling: ${order.ticker} (${order.order_id})`);
         await ordersApi.cancelOrder(order.order_id);
 
-        // Mark trade as cancelled in database
-        await supabase
+        // Try to find and update the trade in database (best effort)
+        const { data: trades } = await supabase
           .from('trades')
-          .update({
-            status: 'cancelled',
-            exit_odds: null,
-            pnl: 0,
-            resolved_at: new Date().toISOString(),
-          })
-          .eq('id', trade.id);
+          .select('id, contract:contracts(market_id)')
+          .eq('status', 'open');
+
+        const matchingTrade = trades?.find((t: any) => t.contract?.market_id === order.ticker);
+
+        if (matchingTrade) {
+          await supabase
+            .from('trades')
+            .update({
+              status: 'cancelled',
+              exit_odds: null,
+              pnl: 0,
+              resolved_at: new Date().toISOString(),
+            })
+            .eq('id', matchingTrade.id);
+        }
 
         cancelled++;
+      } catch (error: any) {
+        console.error(`   ⚠️ Error canceling ${order.order_id}:`, error.message);
+        continue;
       }
-    } catch (error: any) {
-      console.error(`   ⚠️ Error canceling order for trade ${trade.id}:`, error.message);
-      continue;
     }
-  }
 
-  return cancelled;
+    return cancelled;
+  } catch (error: any) {
+    console.error(`   ⚠️ Failed to check for stale orders:`, error.message);
+    return 0;
+  }
 }
 

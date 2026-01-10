@@ -157,7 +157,7 @@ export async function fetchAllMarkets(options?: {
   const rateLimitMs = options?.rateLimitMs ?? 500; // Default 500ms = 2 req/sec (safe)
   const maxPages = options?.maxPages ?? 100; // Safety limit
 
-  console.log(`🔍 Fetching all active markets from Kalshi (with pagination, ${rateLimitMs}ms rate limit)...`);
+  console.log(`📊 Fetching markets from Kalshi...`);
 
   const marketApi = getMarketApi();
 
@@ -189,17 +189,20 @@ export async function fetchAllMarkets(options?: {
       // SDK returns data in response.data
       const markets = response.data.markets || [];
       allMarkets.push(...markets);
-      
+
       // Get next cursor for pagination
       cursor = response.data.cursor || null;
-      
-      console.log(`   Page ${pageCount}: Fetched ${markets.length} markets (total: ${allMarkets.length})`);
-      
+
+      // Only log every 50 pages to reduce noise
+      if (pageCount % 50 === 0) {
+        console.log(`   Progress: ${allMarkets.length} markets loaded...`);
+      }
+
       // If no cursor or empty markets, we're done
       if (!cursor || markets.length === 0) {
         break;
       }
-      
+
       // Rate limit: wait before next request (except for last page)
       if (cursor && markets.length > 0) {
         await sleep(rateLimitMs);
@@ -213,14 +216,14 @@ export async function fetchAllMarkets(options?: {
         await sleep(waitTime);
         continue; // Retry this page
       }
-      
+
       // If rate limited (in error message), wait and retry
       if (error.message?.includes('429') || error.message?.includes('rate')) {
         console.warn(`⚠️ Rate limit error. Waiting ${rateLimitMs * 2}ms before retry...`);
         await sleep(rateLimitMs * 2);
         continue; // Retry this page
       }
-      
+
       console.error(`Error fetching markets page ${pageCount}:`, error.message);
       throw error;
     }
