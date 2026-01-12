@@ -73,9 +73,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
         // Determine outcome based on settlement
         const marketOutcome = settlement.result; // 'yes' or 'no' from Kalshi
+
+        // Skip if settlement doesn't have a result yet
+        if (!marketOutcome || (marketOutcome.toLowerCase() !== 'yes' && marketOutcome.toLowerCase() !== 'no')) {
+          console.log(`   ⚠️ No result yet for ${marketId} (result: ${marketOutcome})`);
+          continue;
+        }
+
         const wasCorrect = (
-          (tradedSide === 'YES' && marketOutcome?.toLowerCase() === 'yes') ||
-          (tradedSide === 'NO' && marketOutcome?.toLowerCase() === 'no')
+          (tradedSide === 'YES' && marketOutcome.toLowerCase() === 'yes') ||
+          (tradedSide === 'NO' && marketOutcome.toLowerCase() === 'no')
         );
 
         const outcome = wasCorrect ? 'won' : 'lost';
