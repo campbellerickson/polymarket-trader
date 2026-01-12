@@ -22,8 +22,12 @@ export const TRADING_CONSTANTS = {
   BANKROLL_DROP_THRESHOLD: 0.70, // 30% drop
   
   // Excluded categories and keywords for filtering
-  // All markets are on the table (crypto, sports, etc.)
   EXCLUDE_CATEGORIES: [],
-  EXCLUDE_KEYWORDS: [],
+  EXCLUDE_KEYWORDS: [
+    'MATCH', // Sports matches
+    'NFL', 'NBA', 'MLB', 'NHL', 'NCAA', // Major leagues
+    'WTA', 'ATP', // Tennis
+    'TOUCHDOWN', 'SCORE', 'WIN', // Sports outcomes
+  ],
 };
 

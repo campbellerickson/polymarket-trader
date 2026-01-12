@@ -68,8 +68,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         const yesOdds = decision.contract_snapshot?.yes_odds || 0;
         const noOdds = decision.contract_snapshot?.no_odds || 0;
 
-        // Assume we bet the lower odds side (higher probability)
-        const tradedSide = noOdds > yesOdds ? 'NO' : 'YES';
+        // We bet on the LOWER odds side (lower probability) - short volatility strategy
+        const tradedSide = yesOdds < noOdds ? 'YES' : 'NO';
 
         // Determine outcome based on settlement
         const marketOutcome = settlement.result; // 'yes' or 'no' from Kalshi
