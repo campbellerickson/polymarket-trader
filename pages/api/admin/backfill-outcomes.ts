@@ -37,7 +37,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     // 2. Get settlements from Kalshi
     const portfolioApi = getPortfolioApi();
-    const { data: settlementsResponse } = await portfolioApi.getSettlements({ limit: 1000 });
+    const { data: settlementsResponse } = await portfolioApi.getSettlements(1000);
     const settlements = (settlementsResponse as any).settlements || [];
 
     console.log(`   Fetched ${settlements.length} settlements from Kalshi`);

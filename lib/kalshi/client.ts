@@ -52,7 +52,7 @@ let portfolioApiInstance: PortfolioApi | null = null;
 let marketApiInstance: MarketApi | null = null;
 let ordersApiInstance: OrdersApi | null = null;
 
-function getPortfolioApi(): PortfolioApi {
+export function getPortfolioApi(): PortfolioApi {
   if (!portfolioApiInstance) {
     portfolioApiInstance = new PortfolioApi(getKalshiConfig());
   }
