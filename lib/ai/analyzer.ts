@@ -91,6 +91,9 @@ CURRENT SITUATION:
 - Daily Budget: $${request.dailyBudget}
 - Contracts Available: ${request.contracts.length}
 
+HARD CONSTRAINT:
+- Do NOT select any contract tied to live or in-progress sports games. Do not bet on live sports.
+
 AVAILABLE CONTRACTS (Pre-filtered to 85-95% odds, good liquidity, <2 days to resolution):
 ${contractsList}
 
