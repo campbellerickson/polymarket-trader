@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { monitorStopLosses } from '../../../lib/trading/stop-loss';
+import { monitorStopLosses, monitorTakeProfits } from '../../../lib/trading/stop-loss';
 import { getMarket, getOrdersApi, getPortfolioPositions } from '../../../lib/kalshi/client';
 import { supabase } from '../../../lib/database/client';
 
@@ -27,6 +27,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   console.log(`🔄 Running sync job (${isDailyRun ? 'DAILY' : 'REGULAR'} mode)...`);
 
   const results: any = {
+    takeProfit: null,
     stopLoss: null,
     checkFills: null,
     cleanup: null,
@@ -36,6 +37,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   };
 
   try {
+    // ===== EVERY RUN: Take Profit Monitoring =====
+    console.log('\n💰 Running take profit monitor...');
+    try {
+      const takeProfitResult = await monitorTakeProfits();
+      results.takeProfit = {
+        success: true,
+        triggered: takeProfitResult.triggered,
+      };
+      console.log(`✅ Take profit complete: ${takeProfitResult.triggered} triggered`);
+    } catch (error: any) {
+      console.error('❌ Take profit failed:', error.message);
+      results.takeProfit = { success: false, error: error.message };
+    }
+
     // ===== EVERY RUN: Stop-Loss Monitoring =====
     console.log('\n🛡️ Running stop loss monitor...');
     try {
@@ -210,7 +225,7 @@ async function cleanupResolvedTrades() {
   const { data, error } = await supabase
     .from('trades')
     .delete()
-    .in('status', ['won', 'lost', 'stopped', 'cancelled'])
+    .in('status', ['won', 'lost', 'stopped', 'cancelled', 'take_profit'])
     .lt('resolved_at', thirtyDaysAgo.toISOString())
     .select();
 

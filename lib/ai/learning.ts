@@ -15,7 +15,7 @@ export async function buildHistoricalContext(): Promise<string> {
   const totalPnL = calculateTotalPnL(resolvedTrades);
   
   // Detailed analysis
-  const winningTrades = resolvedTrades.filter(t => t.status === 'won');
+  const winningTrades = resolvedTrades.filter(t => t.status === 'won' || t.status === 'take_profit');
   const losingTrades = resolvedTrades.filter(t => t.status === 'lost' || t.status === 'stopped');
   
   // Analyze patterns
@@ -84,7 +84,7 @@ ${historyItems}
 
 function calculateWinRate(trades: Trade[]): number {
   if (trades.length === 0) return 0;
-  const wins = trades.filter(t => t.status === 'won').length;
+  const wins = trades.filter(t => t.status === 'won' || t.status === 'take_profit').length;
   return wins / trades.length;
 }
 

@@ -77,9 +77,7 @@ export async function analyzeContracts(
 
 function filterDisallowedMarkets(contracts: Contract[]): Contract[] {
   const disallowedKeywords = [
-    'nba', 'nfl', 'mlb', 'nhl', 'ncaab', 'ncaaf', 'ncaa',
     'atp', 'wta',
-    'bitcoin', 'btc',
   ];
 
   return contracts.filter(contract => {
@@ -115,9 +113,9 @@ ${contractsList}
 RESEARCH each contract deeply and SELECT THE BEST 1-3 opportunities to trade.
 
 YOUR TASK:
-1. RESEARCH each contract thoroughly (understand the actual event, teams, polls, factors)
-2. ANALYZE the odds (is market pricing fair or is there edge based on research?)
-3. CONSIDER exit timing (when does it resolve? Can we exit early with profit?)
+1. RESEARCH each contract thoroughly (understand the current context of events via internet research) 
+2. ANALYZE the odds (do we think the market is pricing this contract accurately?) )
+3. CONSIDER exit timing (visit the contracts page on Kalshi.com... has the priced moved significantly recently? What does that tell us about the contract?)
 4. IDENTIFY specific risks (what could go wrong? How likely?)
 5. COMPARE all contracts and RANK them (which are BEST?)
 6. SELECT the top 1-3 contracts with best risk/reward
@@ -158,6 +156,8 @@ Guidelines:
 - Some risk is OK and expected - focus on finding the BEST risk/reward available
 - BE SPECIFIC in reasoning - what research did you do? What edge did you find?
 - Use historical learning - favor contract types that worked, avoid types that failed
+
+In general, avoid contracts that are live sports games. These odds swing massively, especially in low liquidity markets. You're trying to find asbsolutely certainties that are priced innacurately. 
 `.trim();
 }
 

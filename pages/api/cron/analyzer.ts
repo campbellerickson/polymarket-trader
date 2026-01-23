@@ -37,7 +37,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     // Filter resolved trades (won, lost, stopped, cancelled)
-    const resolvedTrades = allTrades.filter(t => ['won', 'lost', 'stopped', 'cancelled'].includes(t.status));
+    const resolvedTrades = allTrades.filter(t => ['won', 'lost', 'stopped', 'cancelled', 'take_profit'].includes(t.status));
     const openTrades = allTrades.filter(t => t.status === 'open');
 
     console.log(`📈 Total Trades: ${allTrades.length}`);
@@ -52,7 +52,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // ===== CALCULATE CORE METRICS =====
     const totalInvested = resolvedTrades.reduce((sum, t) => sum + t.position_size, 0);
     const totalPnL = resolvedTrades.reduce((sum, t) => sum + (t.pnl || 0), 0);
-    const wins = resolvedTrades.filter(t => t.status === 'won');
+    const wins = resolvedTrades.filter(t => t.status === 'won' || t.status === 'take_profit');
     const losses = resolvedTrades.filter(t => ['lost', 'stopped'].includes(t.status));
     const cancelled = resolvedTrades.filter(t => t.status === 'cancelled');
 

@@ -140,6 +140,85 @@ export async function monitorStopLosses(): Promise<StopLossResult> {
   };
 }
 
+export async function monitorTakeProfits(): Promise<StopLossResult> {
+  console.log('💰 Checking take profit conditions...');
+
+  const config = await getStopLossConfig();
+  const targetPct = TRADING_CONSTANTS.TAKE_PROFIT_PCT;
+
+  if (!config.enabled) {
+    console.log('⏸️ Take profit monitoring disabled (stop loss disabled)');
+    return { triggered: 0, candidates: [], events: [] };
+  }
+
+  const openTrades = await getOpenTrades();
+  console.log(`📊 Monitoring ${openTrades.length} open positions for take profit`);
+
+  const candidates: StopLossCandidate[] = [];
+  let triggeredCount = 0;
+
+  for (const trade of openTrades) {
+    try {
+      const market = await getMarket(trade.contract.market_id);
+
+      if (market.resolved) {
+        continue;
+      }
+
+      const currentOdds = trade.side === 'YES' ? market.yes_odds : market.no_odds;
+      if (currentOdds === 0) {
+        continue;
+      }
+
+      const currentValue = trade.contracts_purchased * currentOdds;
+      const unrealizedPnL = currentValue - trade.position_size;
+      const unrealizedPnLPct = (unrealizedPnL / trade.position_size) * 100;
+
+      const holdTimeHours = (Date.now() - new Date(trade.executed_at).getTime()) / (1000 * 60 * 60);
+
+      const shouldTrigger = currentValue >= trade.position_size * (1 + targetPct);
+
+      const candidate: StopLossCandidate = {
+        trade,
+        currentOdds,
+        entryOdds: trade.entry_odds,
+        unrealizedLoss: unrealizedPnL,
+        unrealizedLossPct: unrealizedPnLPct,
+        holdTimeHours,
+        shouldTrigger,
+        reason: shouldTrigger
+          ? `Profit target reached: ${(unrealizedPnLPct).toFixed(1)}%`
+          : 'Not triggered',
+      };
+
+      candidates.push(candidate);
+
+      if (shouldTrigger) {
+        console.log(`✅ TAKE PROFIT: ${trade.contract.question.substring(0, 50)}...`);
+        console.log(`   Entry: ${(trade.entry_odds * 100).toFixed(1)}% → Current: ${(currentOdds * 100).toFixed(1)}%`);
+        console.log(`   Unrealized P&L: $${unrealizedPnL.toFixed(2)} (${unrealizedPnLPct.toFixed(1)}%)`);
+
+        const result = await executeTakeProfit(trade, currentOdds, `Take profit +${(targetPct * 100).toFixed(0)}% target`);
+        if (result.success) {
+          triggeredCount += 1;
+        }
+      }
+    } catch (error: any) {
+      console.error(`   ⚠️ Error checking trade ${trade.id}:`, error.message);
+    }
+  }
+
+  console.log(`\n📊 Take Profit Summary:`);
+  console.log(`   Total positions: ${openTrades.length}`);
+  console.log(`   Triggered: ${triggeredCount}`);
+
+  return {
+    triggered: triggeredCount,
+    candidates,
+    events: [],
+  };
+}
+
 async function executeStopLoss(
   trade: Trade,
   currentOdds: number,
@@ -199,6 +278,57 @@ async function executeStopLoss(
     
   } catch (error: any) {
     console.error(`❌ Failed to execute stop loss:`, error.message);
+    return { success: false, error: error.message };
+  }
+}
+
+async function executeTakeProfit(
+  trade: Trade,
+  currentOdds: number,
+  reason: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const orderbook = await getOrderbook(trade.contract.market_id);
+
+    const bestBid = trade.side === 'YES' ? orderbook.bestYesBid : orderbook.bestNoBid;
+    const slippage = Math.abs(bestBid - currentOdds) / currentOdds;
+
+    if (slippage > TRADING_CONSTANTS.MAX_SLIPPAGE_PCT) {
+      console.log(`⚠️ Slippage too high (${(slippage * 100).toFixed(2)}%), skipping take profit`);
+      return {
+        success: false,
+        error: `Slippage ${(slippage * 100).toFixed(2)}% exceeds max ${(TRADING_CONSTANTS.MAX_SLIPPAGE_PCT * 100).toFixed(2)}%`,
+      };
+    }
+
+    console.log(`   Selling ${trade.contracts_purchased} ${trade.side} contracts @ ${(bestBid * 100).toFixed(1)}%`);
+
+    await placeOrder({
+      market: trade.contract.market_id,
+      side: trade.side === 'YES' ? 'SELL_YES' : 'SELL_NO',
+      amount: 0,
+      price: Math.max(0.01, bestBid),
+      count: trade.contracts_purchased,
+      type: 'market',
+    });
+
+    const proceeds = trade.contracts_purchased * bestBid;
+    const realizedPnL = proceeds - trade.position_size;
+
+    await updateTrade(trade.id, {
+      status: 'take_profit',
+      exit_odds: bestBid,
+      pnl: realizedPnL,
+      resolved_at: new Date(),
+    });
+
+    console.log(`✅ Take profit executed:`);
+    console.log(`   Sold ${trade.contracts_purchased} contracts @ ${(bestBid * 100).toFixed(1)}%`);
+    console.log(`   Realized P&L: $${realizedPnL.toFixed(2)}`);
+
+    return { success: true };
+  } catch (error: any) {
+    console.error(`❌ Failed to execute take profit:`, error.message);
     return { success: false, error: error.message };
   }
 }
